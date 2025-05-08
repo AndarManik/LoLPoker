@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LoL Poker</title>
+    <style>
+      :root {
+        --u: min(10dvh, 10dvw);
+      }
+
+      * {
+        color: #c89b3c;
+        user-select: none;
+        box-sizing: border-box;
+      }
+
+      @font-face {
+        font-family: "Beaufort";
+        src: url("/fonts/BeaufortforLOL-Bold.ttf") format("truetype");
+      }
+
+      body {
+        margin: 0;
+        font-family: Beaufort;
+        background-color: #010a13;
+        color: #f0e6d2;
+        height: 100svh;
+        width: 100svw;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      /* Layout Containers */
+      .table {
+        position: relative;
+        width: min(calc(100svw - var(--u)), 900px);
+        height: 75svh;
+        top: calc(var(--u) / 2);
+        background: radial-gradient(
+          ellipse at center,
+          #1e2328 0%,
+          #010a13 100%
+        );
+        border: calc(var(--u) / 16) solid #785a28;
+        border-radius: 2rem;
+        padding: 2rem;
+      }
+
+      #board,
+      .opponent {
+        display: flex;
+        gap: calc(var(--u) / 16);
+      }
+
+      .opponent {
+        position: relative;
+        justify-content: center;
+      }
+
+      #board {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        justify-content: center;
+      }
+
+      #player-hand {
+        display: flex;
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        align-items: center;
+        gap: calc(var(--u) / 4);
+      }
+
+      #middle-left,
+      #middle-right {
+        position: absolute;
+        top: min(calc(var(--u) * 3.75), 50%);
+        transform: translateY(-50%);
+      }
+
+      #middle-left {
+        left: 2rem;
+      }
+
+      #middle-right {
+        right: 2rem;
+      }
+
+      .top-opponents {
+        position: absolute;
+        top: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: calc(var(--u) * 0.5);
+      }
+
+      /* Cards */
+      .card {
+        width: calc(var(--u));
+        height: calc(var(--u) * 1.5);
+        background-color: #020106;
+        border: 2px solid #5b5a56;
+        border-radius: 0.5rem;
+        text-align: center;
+      }
+      
+      .card p {
+        display: flex;
+        justify-content: space-evenly;
+        margin: 0;
+        font-size: calc(var(--u) / 3.5);
+        color: #95a1a7;
+      }
+
+      .card span {
+        margin: 0;
+        font-size: calc(var(--u) / 3.5);
+      }
+
+      .card img {
+        padding: 5%;
+        width: 90%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 0.5rem;
+      }
+
+      .noCard {
+        background-color: transparent;
+        border-color: transparent;
+      }
+
+      /* Text and Stats */
+      .text {
+        font-size: calc(var(--u) / 4);
+      }
+
+      #synergy {
+        font-size: calc(var(--u) / 3.75);
+        text-align: center;
+
+      }
+      
+      #synergy p{
+        margin: 0;
+        color: #95a1a7;
+
+      }
+
+
+      /* Control Panel */
+      .control {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: center;
+        align-items: center;
+        width: min(calc(100svw - var(--u)), 900px);
+        height: var(--u);
+        margin: auto 0 calc(var(--u) / 2);
+      }
+
+      .controlButton {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #010a13;
+        background-color: #c89b3c;
+        font-family: Beaufort;
+        font-weight: 600;
+        font-size: calc(var(--u) / 2);
+        border: none;
+        width: calc(var(--u) * 2);
+        height: var(--u);
+        margin-left: calc(var(--u) / 8);
+        border-radius: calc(var(--u) / 16);
+        transition: background-color 0.1s ease-out;
+      }
+
+      .smallText {
+        font-size: calc(var(--u) / 3);
+      }
+
+      .controlButton:hover {
+        background-color: #d7b96d;
+        box-shadow: 0 0 calc(var(--u) / 8) #d7b96d;
+      }
+
+      .noButton {
+        color: #010a1300;
+        background-color: #c89b3c00;
+        font-family: Beaufort;
+        font-weight: 600;
+        font-size: calc(var(--u) / 1.75);
+        border: none;
+        width: calc(var(--u) * 2);
+        height: var(--u);
+        margin-left: calc(var(--u) / 8);
+        border-radius: calc(var(--u) / 16);
+        transition: background-color 0.1s ease-out;
+      }
+
+      .noButton:hover {
+        background-color: #d7b96d00;
+        box-shadow: 0 0 calc(var(--u) / 8) #d7b96d00;
+      }
+
+      #bet {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: calc(var(--u) * 2);
+        height: var(--u);
+        font-weight: 600;
+        font-size: calc(var(--u) / 2);
+        margin-left: calc(var(--u) / 8);
+      }
+
+      #info {
+        display: flex;
+        height: var(--u);
+        font-size: calc(var(--u) / 4);
+      }
+
+      #percent {
+        display: flex;
+        flex-direction: column-reverse;
+        width: calc(var(--u) / 4);
+        height: 100%;
+        border-radius: calc(var(--u) / 16);
+      }
+
+      .percentBorder {
+        border: 1px solid #c89b3c;
+      }
+
+      #fill {
+        height: 0%;
+        width: 100%;
+        background-color: #c89b3c;
+        border-radius: calc(var(--u) / 24);
+        box-shadow: 0 0 calc(var(--u) / 16) #c89b3c;
+        transition: height 0.1s ease-out;
+      }
+
+      .score {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-around;
+        margin-left: calc(var(--u) / 8);
+        height: 100%;
+        width: calc(var(--u) / 1.5);
+      }
+
+      .score p {
+        margin: 0;
+      }
+
+      .pot {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .pot p {
+        margin: 0;
+      }
+
+      #logo {
+        position: absolute;
+        top: 0;
+        font-size: calc(var(--u) / 3.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: calc(var(--u) / 2);
+        width: min(calc(100svw - var(--u)), 900px);
+      }
+
+      #disclaimer {
+        position: absolute;
+        bottom: 0;
+        color: #463714;
+        font-size: calc(var(--u) / 6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: calc(var(--u) / 2);
+        width: min(calc(100svw - var(--u)), 900px);
+        text-align: center;
+      }
+
+      #raise {  
+        display: flex;
+        gap: calc(var(--u) / 16);
+        position: absolute;
+        border-radius: calc(var(--u) / 16);
+        transform: translate(0, calc((var(--u) * -2.75 + var(--u) / -8)));
+        height: calc(var(--u) * 2.75);
+        width: calc(var(--u) * 2);
+        background: linear-gradient(#00000000, #010a13);
+        margin-left: calc(var(--u) / 8);
+
+
+
+        display: none;
+      }
+
+      #raise p {
+        text-align: center;
+        margin: 0;
+        font-size: calc(var(--u) / 3.75);
+      }
+
+      #slider {
+        display: flex;
+        flex-direction: column-reverse;
+        height: 100%;
+        width: calc(var(--u) * 0.75);
+        border-radius: calc(var(--u) / 32);
+        border: calc(var(--u) / 32) solid #c89b3c;
+      }
+
+      #slider:hover {
+        box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
+      }
+
+      #sliderFill {
+        height: 60%;
+        width: 100%;
+        background-color: #c89b3c;
+      }
+
+      #sliderFill:hover {
+        box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
+        background-color: #d7b96d;
+
+      }
+      
+      #increment {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: calc(var(--u) / 16);
+      }
+
+      .incrementButton {
+        font-family: Beaufort;
+        height: 100%;
+        width: 100%;
+        background-color: #c89b3c;
+        color: #010a13;
+        font-size: calc(var(--u) / 4.5);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        border-radius: calc(var(--u) / 32);
+        border: none;
+      }
+
+      .incrementButton:hover {
+        background-color: #d7b96d;
+        box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
+      }
+
+      .opponentBet {
+        position: absolute;
+        text-align: center;
+        transform: translate(0, calc((var(--u) * 1.5)));
+        font-size: calc(var(--u) / 4);
+        color: #95a1a7;
+      }
+    
+      .timer {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        width: 0%;
+        max-width: min(calc(100svw - var(--u)), 900px);
+
+        height: calc(var(--u) / 4);
+        background-color: #95a1a7;
+        transform: translate(0, calc((var(--u) / -3)));
+        border-radius: calc((var(--u) / 32));
+        text-align: center;
+        font-size: calc(var(--u) / 5);
+        color:#010a13;
+        transition: width 0.1s ease-in;
+        }
+
+      .timer p {
+        margin: 0;
+      }
+
+      .zero {
+        color: #95a1a7;
+      }
+
+      .one {
+        color: #41b1b7;
+      }
+
+      .two {
+        color: #5ea4e9;
+      }
+
+      .four {
+        color: #ae87ed;
+      }
+      .control .timer {
+        transform: translate(0, calc((var(--u) / -1.25)));
+        background-color: #95a1a7;
+
+      }
+
+    </style>
+  </head>
+  <body>
+    <div id="logo">League of Poker</div>
+    <div class="table">
+      <div class="top-opponents">
+        <div id="top-left" class="opponent">
+          <div class="card"></div>
+          <div class="card"></div>
+          <div class="opponentBet">60 | 940</div>
+          <div class="timer"></div>
+
+        </div>
+        <div id="top-middle" class="opponent">
+          <div class="card"></div>
+          <div class="card"></div>
+          <div class="opponentBet">60 | 940</div>
+          <div class="timer"></div>
+
+
+        </div>
+        <div id="top-right" class="opponent">
+          <div class="card"></div>
+          <div class="card"></div>
+          <div class="opponentBet">60 | 940</div>
+          <div class="timer"></div>
+
+
+        </div>
+      </div>
+      <div id="board">
+        <div class="card"><img src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png" alt=""><p>
+          0
+          <span style="color: #41b1b7;">1</span>
+          <span style="color: #5ea4e9;">2</span>
+          <span style="color: #ae87ed;">4</span>
+        </p></div>
+        <div class="card noCard"></div>
+        <div class="card noCard"></div>
+        <div class="opponentBet">POT 300</div>
+      </div>
+
+      <div id="player-hand">
+        <div class="card"></div>
+        <div id="synergy"><p>30 | 970</p> <p>Synergy</p> <p><span style="color: #ae87ed;">4</span></p></div>
+
+        <div class="card"></div>
+      </div>
+
+      <div id="middle-left" class="opponent">
+        <div class="card"></div>
+        <div class="card"></div>
+        <div class="opponentBet">60 | 940</div>
+        <div class="timer"></div>
+      </div>
+      <div id="middle-right" class="opponent">
+        <div class="card"></div>
+        <div class="card"></div>
+        <div class="opponentBet">60 | 940</div>
+        <div class="timer"></div>
+
+      </div>
+    </div>
+
+    <div class="control">
+      <div class="timer"></div>
+
+      <div style="position: relative">
+        <div id="raise">
+          <div style="display: flex; flex-direction: column; gap: calc(var(--u) / 16);">
+            <p></p>
+            <div id="slider">
+              <div id="sliderFill"></div>
+            </div>
+          </div>
+
+          <div id="increment">
+            <button class="incrementButton">+5</button>
+            <button class="incrementButton">+10</button>
+            <button class="incrementButton">+50</button>
+            <button class="incrementButton">+100</button>
+            <button class="incrementButton">+500</button>
+            <button class="incrementButton">+1000</button>
+            <dibuttonv class="incrementButton">Confirm</button>
+          </div>
+        </div>
+        <button id="right-button" class="controlButton noButton">Raise</button>
+      </div>
+      <button id="middle-button" class="controlButton noButton">Call</button>
+      <button id="left-button" class="controlButton noButton">Fold</button>
+      <div id="bet">
+      </div>
+      <div id="info">
+        <div id="percent" class="noPercentBorder"><div id="fill"></div></div>
+        <div class="score">
+          <p id="score" title="Score"></p>
+          <p id="chance" title="Win Chance"></p>
+        </div>
+      </div>
+    </div>
+
+    <div id="disclaimer">
+      This project is not affiliated with or endorsed by Riot Games. All League
+      of Legends content is the property of Riot Games, and any related assets
+      will be removed upon request.
+    </div>
+
+    <script src="client.js"></script>
+  </body>
+</html>

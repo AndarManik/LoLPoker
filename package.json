@@ -1,0 +1,21 @@
+{
+  "name": "lolpoker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start:server": "node server.js",
+    "start:datagen": "python -u game_data/datagen.py",
+    "start": "concurrently \"npm run start:server\" \"npm run start:datagen\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
