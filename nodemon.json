@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "cache/**",
+    "game_data/**",
+    "public/**"
+  ]
+}

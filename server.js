@@ -73,14 +73,11 @@ fs.mkdirSync(CACHE_ROOT, { recursive: true });
 
 app.get("/image/:champion", async (req, res) => {
   try {
-    // ⚡ normalise request name (strip non‑alphanum, lower‑case),
-    //    then look up official id from championIdByLower.
     const key = req.params.champion.replace(/[^a-z0-9]/gi, "").toLowerCase();
-    const id = championIdByLower[key] ?? req.params.champion; // fallback if map not ready
+    const id = championIdByLower[key] ?? req.params.champion;
     const file = `${id}.png`;
     const filePath = pathLib.join(CACHE_ROOT, file);
 
-    // --- serve from cache if we already have it -----------------------
     if (fs.existsSync(filePath)) {
       return res
         .type("png")
@@ -88,7 +85,6 @@ app.get("/image/:champion", async (req, res) => {
         .sendFile(filePath);
     }
 
-    // --- otherwise fetch from Data Dragon, cache, and stream ----------
     const cdnURL = `https://ddragon.leagueoflegends.com/cdn/${PATCH}/img/champion/${file}`;
     const response = await fetch(cdnURL);
     if (!response.ok) return res.sendStatus(404);
@@ -105,7 +101,40 @@ app.get("/image/:champion", async (req, res) => {
       .set("Cache-Control", "public, max-age=2592000, immutable")
       .send(buf);
   } catch (err) {
-    console.error("[img‑proxy]", err);
+    console.error("[img-proxy]", err);
+    res.sendStatus(500);
+  }
+});
+
+app.get("/lanes/:lane", async (req, res) => {
+  try {
+    const file = `${req.params.lane.toLowerCase()}.png`;
+    const filePath = pathLib.join(CACHE_ROOT, file);
+
+    if (fs.existsSync(filePath)) {
+      return res
+        .type("png")
+        .set("Cache-Control", "public, max-age=2592000, immutable")
+        .sendFile(filePath);
+    }
+
+    const cdnURL = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-${file}`
+    const response = await fetch(cdnURL);
+    if (!response.ok) return res.sendStatus(404);
+
+    const buf = Buffer.from(await response.arrayBuffer());
+    fs.writeFile(
+      filePath,
+      buf,
+      (e) => e && console.error(`[img‑cache] write failed: ${e.message}`)
+    );
+
+    res
+      .type("png")
+      .set("Cache-Control", "public, max-age=2592000, immutable")
+      .send(buf);
+  } catch (err) {
+    console.error("[img-proxy]", err);
     res.sendStatus(500);
   }
 });

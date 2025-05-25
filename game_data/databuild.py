@@ -1,5 +1,6 @@
 import io
 import sys
+import math
 import json
 import itertools
 import numpy as np
@@ -19,14 +20,15 @@ except AttributeError:
 
 def champ_dict(): return {"wins": 0, "losses": 0}
 
-def load_last_n_days(prefix: str, days: int, folder: str = ".", *,
+def load_last_n_days(prefix: str, days: int, dayspurge: int, folder: str = ".", *,
                      purge_old: bool = True):
     now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
+    purge_date = now - timedelta(days=dayspurge)
     merged = defaultdict(champ_dict)
     folder_path = Path(folder)
 
-    for file in folder_path.glob(f"{prefix}_*.json"):
+    for file in folder_path.glob(f"*{prefix}_*.json"):
         date_part = file.stem.split("_")[-1]
         try:
             file_date = datetime.strptime(date_part, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -35,7 +37,7 @@ def load_last_n_days(prefix: str, days: int, folder: str = ".", *,
             continue
 
         if file_date < start_date:
-            if purge_old:
+            if purge_old and file_date < purge_date:
                 try:
                     file.unlink()
                     print(f"Deleted outdated file {file.name}")
@@ -80,22 +82,89 @@ def verify_synergy_coverage(lanes):
         if len(missing) > 10: print("  ...more not shown.")
         return False, missing
 
-def make_zscore_bucket_classifier(values):
-    mean = np.mean(values)
-    std = np.std(values)
-    z1 = norm.ppf(0.40)
-    z2 = norm.ppf(0.70)
-    z3 = norm.ppf(0.90)
+def compute_error(w, l):
+    n = w + l
+    if n <= 0:return 0.0
+    p = w / n
+    return math.sqrt(p * (1 - p) / n)
 
-    def classify(value):
-        if std == 0: return 0
-        z = (value - mean) / std
+def make_zscore_bucket_classifier(values, errors):
+    """
+    Build a classifier that buckets z-scores into [0,1,2,4] based on
+    the 40th, 70th, and 90th percentiles of a Normal(0,1).
+
+    values : list or array of observed win-rates p_i
+    errors : list or array of their measurement errors e_i
+
+    The between-champion variance σ² is estimated by subtracting the
+    mean(e_i²) from Var(p_i).  In classify(), each z is computed as
+        z = (p - μ) / sqrt(σ² + e²)
+    so that low-sample points get “softened.”
+    """
+    values = np.array(values, dtype=float)
+    errors = np.array(errors, dtype=float)
+
+    # population mean of p_i
+    mu = np.mean(values)
+    # raw variance of p_i
+    var_p = np.var(values, ddof=0)
+    # subtract average measurement-error variance
+    mean_error_sq = np.mean(errors**2)
+    corrected_var = var_p - mean_error_sq
+    sigma_between = math.sqrt(corrected_var) if corrected_var > 0 else 0.0
+
+    scale = 2.5
+    sum = 0
+
+    for i in range(0,5):
+        sum += scale ** i
+
+    # percentile cut-points in z-space
+    z1 = norm.ppf(scale ** 4 / sum)
+    z2 = norm.ppf((scale ** 4 + scale ** 3) / sum)
+    z3 = norm.ppf((scale ** 4 + scale ** 3 + scale ** 2) / sum)
+    z4 = norm.ppf((scale ** 4 + scale ** 3 + scale ** 2 + scale ** 1) / sum)
+
+    def classify(p, e):
+        """
+        p : observed win-rate
+        e : its measurement error (as from compute_error)
+        """
+        if sigma_between == 0: return 0
+        denom = math.sqrt(sigma_between**2 + e**2)
+        if denom == 0: z = 0.0
+        else: z = (p - mu) / denom
         if z < z1: return 0
         elif z < z2: return 1
         elif z < z3: return 2
-        else: return 4
+        elif z < z4: return 4
+        else: return 8
 
     return classify
+
+import math
+
+def normalized_winrate(a, b):
+    """
+    Compute the “normalized” win rate for two champions with solo win rates a and b.
+
+    Args:
+        a: Win rate of champion A (0 < a < 1)
+        b: Win rate of champion B (0 < b < 1)
+
+    Returns:
+        c: Normalized expected win rate of the pair.
+    """
+    # turn probabilities into log-odds
+    la = math.log(a / (1 - a))
+    lb = math.log(b / (1 - b))
+
+    # average log-odds
+    lm = 0.5 * (la + lb)
+
+    # back to probability
+    return 1 / (1 + math.exp(-lm))
+
 
 
 def build_game_data():
@@ -103,10 +172,11 @@ def build_game_data():
         Get the data from the last 30 days and compile into two dicts
     '''
     # Load data from last 5 days
-    winrate_data = load_last_n_days("winrate", 30, 'game_data/')
-    synergy_data = load_last_n_days("synergy", 30, 'game_data/')
+    winrate_data = load_last_n_days("winrate", 28, 28, 'game_data/')
+    synergy_data = load_last_n_days("synergy", 28, 28, 'game_data/')
     print("Data load success")
     
+    match_count = 0
     lanes = {
         'TOP':{}, 
         'MIDDLE': {}, 
@@ -117,10 +187,12 @@ def build_game_data():
     # Fill lanes from winrate_data
     for k, v in winrate_data.items():
         champion, lane = k.split('+')
+        match_count += v['wins'] + v['losses']
         lanes.get(lane, {})[champion] = {
             'n': champion,
             'g': v['wins'] + v['losses'],
             'w': v['wins'] / (v['wins'] + v['losses']),
+            'e': compute_error(v['wins'], v['losses']),
             's': {
                 'TOP':{}, 
                 'MIDDLE': {}, 
@@ -129,6 +201,7 @@ def build_game_data():
                 'UTILITY': {}
             }
         }
+    match_count /= 10
     # Fill synergy maps from synergy_data
     for k, v in synergy_data.items():
         champion1, champion2, lane1, lane2 = k.split("+")
@@ -137,18 +210,26 @@ def build_game_data():
         if champion1 == champion2: continue
         if champion1 not in lanes[lane1]: continue
         if champion2 not in lanes[lane2]: continue
-        average_winrate = lanes[lane1][champion1]['w'] 
-        average_winrate += lanes[lane2][champion2]['w']
-        average_winrate /= 2
         games_played = v['wins'] + v['losses']
+        if games_played < 50: continue
+        
+        average_winrate = normalized_winrate(lanes[lane1][champion1]['w'], lanes[lane2][champion2]['w'])        
+        pair_winrate = v['wins'] / games_played
+        
+        pair_error = compute_error(v['wins'], v['losses'])
+        
+        delta_winrate = pair_winrate  - average_winrate
         lanes[lane1][champion1]['s'][lane2][champion2] = {
             'g': games_played,
-            'w': v['wins'] / games_played - average_winrate,
+            'w': delta_winrate,
+            'e': pair_error,
         }
         lanes[lane2][champion2]['s'][lane1][champion1] = {
             'g': v['wins'] + v['losses'],
-            'w': v['wins'] / games_played - average_winrate,
+            'w': delta_winrate,
+            'e': pair_error,
         }
+        
     
     print("data parse success")
 
@@ -246,13 +327,12 @@ def build_game_data():
     '''
     
     champ_values = [champion['w'] for champions in lanes.values() for champion in champions.values()]
-    strength_score = make_zscore_bucket_classifier(champ_values)
+    champ_errors = [champion['e'] for champions in lanes.values() for champion in champions.values()]
+    strength_score = make_zscore_bucket_classifier(champ_values, champ_errors)
 
     for champions in lanes.values():
         for champion in champions.values():
-            champion['p'] = strength_score(champion['w'])
-            del champion['w']
-            del champion['g']
+            champion['p'] = strength_score(champion['w'], champion['e'])
 
     synergy_values = [
         schampion['w']
@@ -261,34 +341,110 @@ def build_game_data():
         for schampions in champion['s'].values()
         for schampion in schampions.values()
     ]
-    synergy_score = make_zscore_bucket_classifier(synergy_values)
+    
+    synergy_errors = [
+        schampion['e']
+        for champions in lanes.values()
+        for champion in champions.values()
+        for schampions in champion['s'].values()
+        for schampion in schampions.values()
+    ]
+    synergy_score = make_zscore_bucket_classifier(synergy_values, synergy_errors)
 
     for champions in lanes.values():
         for champion in champions.values():
             for schampions in champion['s'].values():
                 for schampion in schampions.values():
-                    schampion['p'] = synergy_score(schampion['w'])
-                    del schampion['w']
-                    del schampion['g']
+                    schampion['p'] = synergy_score(schampion['w'], schampion['e'])
         
     formated_lane = {}
-    
+    champion_powers = []
+    score_distribution = {0: 0, 1: 0, 2: 0, 4: 0, 8: 0}
+    synergy_distribution = {0: 0, 1: 0, 2: 0, 4: 0, 8: 0}
+
     for lane, champions in lanes.items():
         formated_lane[lane] = []
         for champion in champions.values():
+            champion_power = champion['p']
             synergy = {}
+            
             for slane, schampions in champion['s'].items():
+                power_sum = 0
+                count = 0
                 synergy[slane] = {}
+                
                 for k, v in schampions.items():
                     synergy[slane][k] = v['p']
+                    power_sum += v['p']
+                    count += 1
+                    synergy_distribution[v['p']] += 1
+                    
+                if count == 0: continue
+                power_sum /= count
+                champion_power += power_sum
             
+            champion_power = math.floor(champion_power * 100) / 100
             formated_lane[lane].append({
                 'name': champion['n'],
                 'lane': lane,
                 'points': champion['p'],
+                'power': champion_power,
                 'synergy': synergy
             })
+            
+            score_distribution[champion['p']] += 1
+
+            
+            champion_powers.append([champion['n']+ " " + lane, champion_power])
+            
+    champion_powers.sort(key=lambda x: x[1])
+    for champ in champion_powers:
+        print(champ[1],champ[0])
+    print("Number of Champions: ", len(champion_powers))
+    print(score_distribution)
+    print(synergy_distribution)
+    
+    synergy_powers = []
+    for lane1, champions1 in formated_lane.items():
+        for lane2, champions2 in formated_lane.items():
+            if lane1 <= lane2: continue
+            for champion1 in champions1:
+                for champion2 in champions2:
+                    name1 = champion1['name']
+                    name2 = champion2['name']
+                    if name1 == name2: continue
                     
+                    synergy_power = champion1['points'] + champion2['points']
+                    synergy_power += champion1['synergy'][lane2][name2]
+                    
+                    for lane3, champions3 in formated_lane.items():
+                        if lane1 == lane3 or lane2 == lane3: continue
+                        syn_sum = 0
+                        syn_cnt = 0
+                        for champion3 in champions3:
+                            if name1 == champion3['name']: continue
+                            if name2 == champion3['name']: continue
+                            syn_sum += champion3['synergy'][lane1][name1]
+                            syn_sum += champion3['synergy'][lane2][name2]
+                            syn_cnt += 1
+                        synergy_power += 1.0 * syn_sum / syn_cnt
+                    synergy_powers.append({
+                        'champ1': f'{name1} {lane1}',
+                        'champ2': f'{name2} {lane2}', 
+                        'strength': synergy_power
+                    })
+                    
+                    
+    synergy_powers.sort(key=lambda x: x['strength'])       
+                
+    formated_lane['_meta'] = {
+        "champ_count": len(champion_powers),
+        "score_distribution": score_distribution,
+        "synergy_distribution": synergy_distribution,
+        "match_count": match_count,
+        "champion_powers": champion_powers,
+        "synergy_powers": synergy_powers
+    }
     with open('game_data.json', 'w') as f:
         json.dump(formated_lane, f, indent=2)
     

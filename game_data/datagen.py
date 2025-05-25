@@ -3,6 +3,7 @@ import gc
 import json
 import time
 import random
+import argparse
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
@@ -10,14 +11,30 @@ from datetime import datetime, UTC
 from collections import deque, defaultdict
 from databuild import build_game_data
 
-import traceback
-
 load_dotenv()
 API_KEY = os.getenv("RIOT_API_KEY")
 if not API_KEY: raise ValueError("Add RIOT_API_KEY into .env")
-REGION = os.getenv("REGION", "na1")
-MATCH_REGION = os.getenv("MATCH_REGION", "americas")
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--match-region", 
+    choices=["americas", "europe", "asia"], 
+    default="americas", 
+    help="Regional routing (default: americas)"
+)
+args = parser.parse_args()
+MATCH_REGION = args.match_region
+REGION = {
+    "americas": "na1",
+    "europe":   "euw1",
+    "asia":     "kr"
+}[MATCH_REGION]
 QUEUE = 420
+MAX_MATCHES = 2000
+MAX_PUUIDS = 100
+
+BASE_URL = f"https://{REGION}.api.riotgames.com/lol"
+BASE_URL_MATCH =f"https://{MATCH_REGION}.api.riotgames.com/lol/match/v5/matches"
 
 class RateLimiter:
     def __init__(self):
@@ -31,9 +48,9 @@ class RateLimiter:
             if now < self.next:
                 time.sleep(self.next - now)
                 continue
-            while self.short and now - self.short[0] > 1: self.short.popleft()
+            while self.short and now - self.short[0] > 1.2: self.short.popleft()
             while self.long and now - self.long[0] > 120: self.long.popleft()
-            if len(self.short) < 20 and len(self.long) < 100: break
+            if len(self.short) < 1 and len(self.long) < 100: break
             time.sleep(0.05)
         now = time.time()
         self.short.append(now)
@@ -59,32 +76,31 @@ def limited_get(url):
 
 
 def get_diamond_plus_seed():
-    data = limited_get(f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/RANKED_SOLO_5x5/DIAMOND/I")
-    seed = []
-    for entry in data[:1]:
-        summoner_id = entry['summonerId']
-        try:
-            puuid = get_puuid(summoner_id)
-            seed.append({"summonerId": summoner_id, "puuid": puuid})
-            print(f"Puuid for {summoner_id}")
-        except Exception as e: print(f"Failed puuid get{summoner_id}: {e}")
-    return seed
+    extension = "/league/v4/entries/RANKED_SOLO_5x5/DIAMOND/I"
+    return [{
+        "summonerId": entry['summonerId'], 
+        "puuid": get_puuid(entry['summonerId'])
+    } for entry in limited_get(BASE_URL + extension)[:1]]
 
 
-def get_puuid(summoner_id): return limited_get(f"https://{REGION}.api.riotgames.com/lol/summoner/v4/summoners/{summoner_id}")["puuid"]
+def get_puuid(summoner_id): 
+    extension = f"/summoner/v4/summoners/{summoner_id}"
+    return limited_get(BASE_URL + extension)["puuid"]
 
 
-def get_match_ids(puuid, count=5): return limited_get(f"https://{MATCH_REGION}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?count={count}&queue={QUEUE}")
+def get_match_ids(puuid, count=5): 
+    extension = f"/by-puuid/{puuid}/ids?count={count}&queue={QUEUE}"
+    return limited_get(BASE_URL_MATCH + extension)
 
 
-def get_match_data(match_id): return limited_get(f"https://{MATCH_REGION}.api.riotgames.com/lol/match/v5/matches/{match_id}")
+def get_match_data(match_id): 
+    extension = f"/{match_id}"
+    return limited_get( BASE_URL_MATCH + extension )
 
 def normalize_key(champ1, champ2, lane1, lane2):
     direction = (lane1, champ1) <= (lane2, champ2)
     if direction: return f"{champ1}+{champ2}+{lane1}+{lane2}"
     else: return f"{champ2}+{champ1}+{lane2}+{lane1}"
-
-
 
 def stream_dump(obj, file_path: str, *, ensure_ascii: bool = False) -> None:
     enc = json.JSONEncoder(ensure_ascii=ensure_ascii,separators=(",", ":"))
@@ -94,16 +110,16 @@ def stream_dump(obj, file_path: str, *, ensure_ascii: bool = False) -> None:
 
 def save_data(winrates: dict, synergy: dict) -> None:
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
-    stream_dump(winrates, f"game_data/winrate_{date_str}.json")
-    stream_dump(synergy,  f"game_data/synergy_{date_str}.json")
-    print(f"Saved data for {date_str}")
+    stream_dump(winrates, f"game_data/{REGION}_winrate_{date_str}.json")
+    stream_dump(synergy,  f"game_data/{REGION}_synergy_{date_str}.json")
+    #print(f"Saved data for {date_str}")
 
 def champ_dict(): return {"wins": 0, "losses": 0}
 
 def load_existing_data():
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
-    winrate_path = Path(f"game_data/winrate_{date_str}.json")
-    synergy_path = Path(f"game_data/synergy_{date_str}.json")
+    winrate_path = Path(f"game_data/{REGION}_winrate_{date_str}.json")
+    synergy_path = Path(f"game_data/{REGION}_synergy_{date_str}.json")
 
     if winrate_path.exists(): 
         with open(winrate_path, "r") as f:
@@ -120,23 +136,16 @@ def load_existing_data():
 
 
 def get_rank(summoner_id):
-    url = f"https://{REGION}.api.riotgames.com/lol/league/v4/entries/by-summoner/{summoner_id}"
-    try:
-        entries = limited_get(url)
-        for entry in entries:
-            if entry["queueType"] == "RANKED_SOLO_5x5": return entry["tier"]
-    except Exception as e: print(f"Failed rank check{summoner_id}: {e}")
-    return False
+    extension = f"/league/v4/entries/by-summoner/{summoner_id}"
+    for e in limited_get(BASE_URL + extension): 
+        if e["queueType"] == "RANKED_SOLO_5x5": return e["tier"]
+    return ""
 
-def is_emerald_plus(rank): return rank in ["EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]
+def is_emerald_plus(rank): 
+    return rank in ["EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"]
 
-
-import time
 
 time.sleep(10)  # sleep for 10 seconds so server can start first
-
-MAX_MATCHES = 2000
-MAX_PUUIDS = 100
 
 # Initialize
 seed_dict = {p["puuid"]: p for p in get_diamond_plus_seed()}
@@ -217,14 +226,15 @@ try:
 
                 del match  # Explicitly release large object
 
-            print(f"Processed {summoner_id[:10]}")
+            print(f"Processed {REGION} {summoner_id[:10]}")
             save_data(winrates, synergy)
 
             current_date_str = datetime.now(UTC).strftime("%Y-%m-%d")
             if current_date_str != last_date_str:
-                winrates.clear()
-                synergy.clear()
-                build_game_data()
+                if last_date_str:
+                    winrates.clear()
+                    synergy.clear()
+                if REGION == 'na1': build_game_data()
                 last_date_str = current_date_str
 
             if time.time() - last_save_time > 30:
@@ -232,10 +242,12 @@ try:
                 last_save_time = time.time()
 
         except Exception as e:
-            traceback.print_exc()
+            #traceback.print_exc()
             print(f"Error summoner {summoner_id[:10]}: {e}")
 
 except KeyboardInterrupt:
     print("Interrupted by user. Saving progress...")
     save_data(winrates, synergy)
     print("Data saved. Exiting cleanly.")
+
+print(REGION, "Ended suddenly")

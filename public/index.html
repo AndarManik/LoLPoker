@@ -10,7 +10,7 @@
       }
 
       * {
-        color: #c89b3c;
+        color: oklch(0.85 0.0125 225);
         user-select: none;
         box-sizing: border-box;
       }
@@ -52,7 +52,7 @@
       #board,
       .opponent {
         display: flex;
-        gap: calc(var(--u) / 16);
+        gap: calc(var(--u) / 32);
       }
 
       .opponent {
@@ -71,11 +71,12 @@
       #player-hand {
         display: flex;
         position: absolute;
-        bottom: 2rem;
+        bottom: calc(var(--u) / 3);
         left: 50%;
         transform: translateX(-50%);
         align-items: center;
-        gap: calc(var(--u) / 4);
+        justify-content: center;
+        gap: calc(var(--u) / 32);
       }
 
       #middle-left,
@@ -86,16 +87,16 @@
       }
 
       #middle-left {
-        left: 2rem;
+        left: calc(var(--u) / 3);
       }
 
       #middle-right {
-        right: 2rem;
+        right: calc(var(--u) / 3);
       }
 
       .top-opponents {
         position: absolute;
-        top: 2rem;
+        top: calc(var(--u) / 3);
         left: 50%;
         transform: translateX(-50%);
         display: flex;
@@ -104,25 +105,51 @@
 
       /* Cards */
       .card {
-        width: calc(var(--u));
-        height: calc(var(--u) * 1.5);
+        position: relative;
+        width: calc(var(--u) * 0.75);
+        height: calc(var(--u) * 1.5 * 0.75);
         background-color: #020106;
-        border: 2px solid #5b5a56;
-        border-radius: 0.5rem;
+        border: calc(var(--u) / 48) solid #54666f;
+        border-radius: calc(var(--u) / 16);
         text-align: center;
       }
-      
+
+      .currentPlayer {
+        border: calc(var(--u) / 48) solid oklch(0.5 0.075 80);
+      }
+
+      .foldedPlayer {
+        border: none;
+      }
+
+      .allInPlayer {
+        border: calc(var(--u) / 48) solid oklch(0.5 0.075 20);
+      }
+
+      .waitingPlayer {
+        border: calc(var(--u) / 48) solid oklch(0.5 0.025 230);
+      }
+
+      .finishedPlayer {
+        border: calc(var(--u) / 48) solid oklch(0.5 0.075 145);
+      }
+
       .card p {
         display: flex;
         justify-content: space-evenly;
         margin: 0;
-        font-size: calc(var(--u) / 3.5);
-        color: #95a1a7;
+        font-size: calc(var(--u) / 4.5);
+        color: oklch(0.85 0.0125 225);
       }
 
       .card span {
         margin: 0;
-        font-size: calc(var(--u) / 3.5);
+        font-size: calc(var(--u) / 4.5);
+      }
+
+      .opponentBet span {
+        margin: 0;
+        font-size: calc(var(--u) / 4.5);
       }
 
       .card img {
@@ -130,7 +157,6 @@
         width: 90%;
         aspect-ratio: 1;
         object-fit: cover;
-        border-radius: 0.5rem;
       }
 
       .noCard {
@@ -140,21 +166,8 @@
 
       /* Text and Stats */
       .text {
-        font-size: calc(var(--u) / 4);
+        font-size: calc(var(--u) / 4.5);
       }
-
-      #synergy {
-        font-size: calc(var(--u) / 3.75);
-        text-align: center;
-
-      }
-      
-      #synergy p{
-        margin: 0;
-        color: #95a1a7;
-
-      }
-
 
       /* Control Panel */
       .control {
@@ -195,6 +208,16 @@
         box-shadow: 0 0 calc(var(--u) / 8) #d7b96d;
       }
 
+      .activeButton {
+        background-color: #d7b96d;
+        box-shadow: 0 0 calc(var(--u) / 8) #d7b96d;
+      }
+
+      .activeButton:hover {
+        background-color: #ead6a3;
+        box-shadow: 0 0 calc(var(--u) / 8) #ead6a3;
+      }
+
       .noButton {
         color: #010a1300;
         background-color: #c89b3c00;
@@ -223,6 +246,13 @@
         font-weight: 600;
         font-size: calc(var(--u) / 2);
         margin-left: calc(var(--u) / 8);
+        background-color: oklch(0.85 0.0125 225);
+        color: #010a13;
+        border-radius: calc(var(--u) / 16);
+      }
+
+      .noBet {
+          background-color: #00000000 !important;
       }
 
       #info {
@@ -277,7 +307,7 @@
       #logo {
         position: absolute;
         top: 0;
-        font-size: calc(var(--u) / 3.5);
+        font-size: calc(var(--u) / 4.5);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -289,7 +319,7 @@
         position: absolute;
         bottom: 0;
         color: #463714;
-        font-size: calc(var(--u) / 6);
+        font-size: calc(var(--u) / 7);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -298,7 +328,7 @@
         text-align: center;
       }
 
-      #raise {  
+      #raise {
         display: flex;
         gap: calc(var(--u) / 16);
         position: absolute;
@@ -308,16 +338,13 @@
         width: calc(var(--u) * 2);
         background: linear-gradient(#00000000, #010a13);
         margin-left: calc(var(--u) / 8);
-
-
-
         display: none;
       }
 
       #raise p {
         text-align: center;
         margin: 0;
-        font-size: calc(var(--u) / 3.75);
+        font-size: calc(var(--u) / 4.5);
       }
 
       #slider {
@@ -342,9 +369,8 @@
       #sliderFill:hover {
         box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
         background-color: #d7b96d;
-
       }
-      
+
       #increment {
         height: 100%;
         width: 100%;
@@ -373,14 +399,24 @@
         box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
       }
 
+      
       .opponentBet {
         position: absolute;
         text-align: center;
-        transform: translate(0, calc((var(--u) * 1.5)));
-        font-size: calc(var(--u) / 4);
-        color: #95a1a7;
+        transform: translate(0, calc((var(--u) * 1.125)));
+        font-size: calc(var(--u) / 4.5);
+        color: oklch(0.85 0.0125 225);
       }
-    
+
+      #player-hand .opponentBet {
+        transform: translate(0, calc((var(--u) * -1)));
+      }
+
+      .opponentBet p {
+        color: oklch(0.85 0.0125 225);
+        margin: 0;
+      }
+
       .timer {
         position: absolute;
         display: flex;
@@ -390,93 +426,263 @@
         max-width: min(calc(100svw - var(--u)), 900px);
 
         height: calc(var(--u) / 4);
-        background-color: #95a1a7;
         transform: translate(0, calc((var(--u) / -3)));
         border-radius: calc((var(--u) / 32));
         text-align: center;
         font-size: calc(var(--u) / 5);
-        color:#010a13;
+        color: #010a13;
         transition: width 0.1s ease-in;
-        }
+
+        background-image: linear-gradient(
+          60deg,
+          #c89b3c 40%,
+          #cda861 50%,
+          #c89b3c 60%
+        );
+        background-size: 200% 100%;
+        animation: shimmerMove 4s infinite linear;
+      }
 
       .timer p {
         margin: 0;
       }
 
       .zero {
-        color: #95a1a7;
+        color: oklch(0.7 0.05 150);
       }
 
       .one {
-        color: #41b1b7;
+        color: oklch(0.7 0.075 187.5);
+        background: linear-gradient(
+          60deg,
+          oklch(0.7 0.075 187.5) 40%,
+          oklch(0.75 0.025 187.5) 50%,
+          oklch(0.7 0.075 187.5) 60%
+        );
+        background-size: 200% 100%;
+        color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation: shimmerMove 2s infinite linear;
       }
 
       .two {
-        color: #5ea4e9;
+        color: oklch(0.7 0.1 225);
+        background: linear-gradient(
+          60deg,
+          oklch(0.7 0.1 225) 40%,
+          oklch(0.8 0.05 225) 50%,
+          oklch(0.7 0.1 225) 60%
+        );
+        background-size: 200% 100%;
+        color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation: shimmerMove 2s infinite linear;
       }
 
       .four {
-        color: #ae87ed;
+        color: oklch(0.7 0.15 300);
+        background: linear-gradient(
+          60deg,
+          oklch(0.7 0.15 300) 40%,
+          oklch(0.85 0.0125 225) 50%,
+          oklch(0.7 0.15 300) 60%
+        );
+        background-size: 200% 100%;
+        color: transparent;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation: shimmerMove 2s infinite linear;
       }
+
+      .shimmer {
+        display: inline-block; /* so it hugs your text */
+        background-size: 200% 100%; /* twice as wide as the text box */
+        /* clip & hide the fill so you see the gradient through the letters */
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        animation: shimmerMove 2s infinite linear;
+      }
+
+      .shimmerBlock {
+        background-size: 100% 200%;
+        animation: shimmerMoveBlock 4s infinite linear;
+      }
+
+      @keyframes shimmerMoveBlock {
+        from {
+          background-position: 0 100%;
+        }
+        to {
+          background-position: 0 -100%;
+        }
+      }
+
+      @keyframes shimmerMove {
+        from {
+          background-position: -100% 0;
+        }
+        to {
+          background-position: 100% 0;
+        }
+      }
+
       .control .timer {
         transform: translate(0, calc((var(--u) / -1.25)));
-        background-color: #95a1a7;
-
+        background-image: linear-gradient(
+          60deg,
+          #c89b3c 40%,
+          #cda861 50%,
+          #c89b3c 60%
+        );
+        background-size: 200% 100%;
+        animation: shimmerMove 4s infinite linear;
       }
 
+      .laneIcon {
+        opacity: 0.5;
+        padding: 5%;
+        width: 10%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        border-radius: 0.5rem;
+        margin-right: auto;
+      }
+
+      #lanes img {
+        height: calc(var(--u) / 3);
+        width: calc(var(--u) / 3);
+      }
+
+      .activeLane {
+        opacity: 0.8;
+      }
+
+      .inactiveLane {
+        opacity: 0.2;
+      }
     </style>
   </head>
   <body>
-    <div id="logo">League of Poker</div>
+    <div id="logo">
+      <h3>League of Poker</h3>
+      <input
+        type="range"
+        style="z-index: 1000; position: fixed; left: calc(var(--u) / 4)"
+        id="size-slider"
+        min="0.1"
+        max="20"
+        value="10"
+      />
+    </div>
     <div class="table">
       <div class="top-opponents">
         <div id="top-left" class="opponent">
-          <div class="card"></div>
-          <div class="card"></div>
+          <div class="card currentPlayer"></div>
+          <div class="card waitingPlayer"></div>
           <div class="opponentBet">60 | 940</div>
           <div class="timer"></div>
-
         </div>
         <div id="top-middle" class="opponent">
-          <div class="card"></div>
-          <div class="card"></div>
+          <div class="card foldedPlayer"></div>
+          <div class="card allInPlayer"></div>
           <div class="opponentBet">60 | 940</div>
           <div class="timer"></div>
-
-
         </div>
         <div id="top-right" class="opponent">
-          <div class="card"></div>
+          <div class="card finishedPlayer"></div>
           <div class="card"></div>
           <div class="opponentBet">60 | 940</div>
           <div class="timer"></div>
-
-
         </div>
       </div>
       <div id="board">
-        <div class="card"><img src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png" alt=""><p>
-          0
-          <span style="color: #41b1b7;">1</span>
-          <span style="color: #5ea4e9;">2</span>
-          <span style="color: #ae87ed;">4</span>
-        </p></div>
+        <div class="card">
+          <img
+            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
+            alt=""
+          />
+          <p>
+            <span class="zero">0</span>
+            <span class="one">1</span>
+            <span class="two">3</span>
+            <span class="four">7</span>
+          </p>
+        </div>
         <div class="card noCard"></div>
         <div class="card noCard"></div>
-        <div class="opponentBet">POT 300</div>
+
+        <div class="opponentBet">
+          <p>POT 300</p>
+          <div id="lanes" style="display: flex">
+            <img
+              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png"
+              alt="Top lane icon"
+              class="activeLane"
+            />
+            <img
+              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png"
+              alt="Top lane icon"
+              class="activeLane"
+            />
+            <img
+              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png"
+              alt="Top lane icon"
+              class="activeLane"
+            />
+            <img
+              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png"
+              alt="Top lane icon"
+              class="inactiveLane"
+            />
+            <img
+              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png"
+              alt="Top lane icon"
+              class="inactiveLane"
+            />
+          </div>
+        </div>
       </div>
 
       <div id="player-hand">
         <div class="card"></div>
-        <div id="synergy"><p>30 | 970</p> <p>Synergy</p> <p><span style="color: #ae87ed;">4</span></p></div>
-
+        <div id="synergy" class="opponentBet">
+          <p>30 | 970</p>
+          <p>Synergy</p>
+          <p><span style="color: #ae87ed">4</span></p>
+        </div>
         <div class="card"></div>
       </div>
 
       <div id="middle-left" class="opponent">
-        <div class="card"></div>
-        <div class="card"></div>
-        <div class="opponentBet">60 | 940</div>
+        <div class="card">
+          <img
+            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
+            alt=""
+          />
+          <p>
+            <span style="color: #41b1b7">1</span>
+            <span style="color: #5ea4e9">2</span>
+            <span style="color: #41b1b7">1</span>
+            <span style="color: #5ea4e9">2</span>
+          </p>
+        </div>
+        <div class="card">
+          <img
+            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
+            alt=""
+          />
+          <p>
+            <span style="color: #41b1b7">1</span>
+            <span style="color: #5ea4e9">2</span>
+            <span style="color: #41b1b7">1</span>
+            <span style="color: #5ea4e9">2</span>
+          </p>
+        </div>
+        <div class="opponentBet">20 / 32</div>
         <div class="timer"></div>
       </div>
       <div id="middle-right" class="opponent">
@@ -484,7 +690,6 @@
         <div class="card"></div>
         <div class="opponentBet">60 | 940</div>
         <div class="timer"></div>
-
       </div>
     </div>
 
@@ -493,31 +698,36 @@
 
       <div style="position: relative">
         <div id="raise">
-          <div style="display: flex; flex-direction: column; gap: calc(var(--u) / 16);">
-            <p></p>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: calc(var(--u) / 16);
+            "
+          >
+            <p id="raiseSize"></p>
             <div id="slider">
               <div id="sliderFill"></div>
             </div>
           </div>
 
           <div id="increment">
+            <button class="incrementButton">-50</button>
+            <button class="incrementButton">-10</button>
+            <button class="incrementButton">-5</button>
             <button class="incrementButton">+5</button>
             <button class="incrementButton">+10</button>
             <button class="incrementButton">+50</button>
-            <button class="incrementButton">+100</button>
-            <button class="incrementButton">+500</button>
-            <button class="incrementButton">+1000</button>
-            <dibuttonv class="incrementButton">Confirm</button>
+            <button class="incrementButton">Confirm</button>
           </div>
         </div>
         <button id="right-button" class="controlButton noButton">Raise</button>
       </div>
       <button id="middle-button" class="controlButton noButton">Call</button>
       <button id="left-button" class="controlButton noButton">Fold</button>
-      <div id="bet">
-      </div>
+      <div id="bet">25</div>
       <div id="info">
-        <div id="percent" class="noPercentBorder"><div id="fill"></div></div>
+        <div id="percent"><div id="fill"></div></div>
         <div class="score">
           <p id="score" title="Score"></p>
           <p id="chance" title="Win Chance"></p>

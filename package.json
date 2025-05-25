@@ -4,9 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "demon": "nodemon server.js",
     "start:server": "node server.js",
-    "start:datagen": "python -u game_data/datagen.py",
-    "start": "concurrently \"npm run start:server\" \"npm run start:datagen\""
+    "datagen:americas": "python -u game_data/datagen.py --match-region=americas",
+    "datagen:europe": "python -u game_data/datagen.py --match-region=europe",
+    "datagen:asia": "python -u game_data/datagen.py --match-region=asia",
+    "datagen": "concurrently \"npm run datagen:americas\" \"npm run datagen:europe\" \"npm run datagen:asia\"",
+    "server": "concurrently \"npm run datagen:server\" \"npm run datagen:americas\" \"npm run datagen:europe\" \"npm run datagen:asia\""
   },
   "keywords": [],
   "author": "",
