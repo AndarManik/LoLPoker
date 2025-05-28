@@ -24,7 +24,7 @@ class Game {
     } else {
       this.spectators.push(player);
       player.state = "queue up";
-      socket.send(JSON.stringify({ leftButton: "queue up" })); // CALM: add players data
+      socket.send(JSON.stringify({ leftButton: "queue up" }));
     }
 
     socket.on("message", (message) => this.onMessage(player, message));
@@ -67,6 +67,13 @@ class Game {
         this.spectators.push(player);
         player.socket.send(JSON.stringify({ leftButton: "queue up" }));
         this.sendQueue();
+        break;
+      case "name":
+        player.name = data.name;
+        if (this.state === "ready up") return;
+        if (this.state === "finished") return this.sendFinished(false);
+        if (this.state === "chopped") return this.sendFinished(false);
+        this.sendTurn(false);
         break;
       case "check":
         if (player.state !== "current turn") return;
@@ -114,6 +121,12 @@ class Game {
         }
         this.nextPlayer(player);
         break;
+      case "show":
+        if (player.state !== "folded") return;
+        if (this.state !== "finished" && this.state !== "chopped") return;
+        if (player.winner) player.state = "current turn";
+        else player.state = "waiting turn";
+        this.sendFinished(false);
     }
   }
 
@@ -153,7 +166,6 @@ class Game {
       case "current turn":
       case "finished turn":
       case "waiting turn":
-
         if (player.choiceTimeout) player.exitTick();
         const playerIndex = this.players.indexOf(player);
         this.players.splice(playerIndex, 1);
@@ -180,7 +192,9 @@ class Game {
   }
 
   startGame() {
-    this.state = "first bet";
+    if (this.state !== "ready up") return;
+
+    this.state = "zeroth card";
     this.pickOrder = shuffle(["TOP", "MIDDLE", "JUNGLE", "BOTTOM", "UTILITY"]);
     this.deck = this.pickOrder.map(
       (lane) => shuffle(this.gameData[lane]).map((x) => x) //sorta clone
@@ -206,6 +220,7 @@ class Game {
       const [left, right] = hand;
       player.hand = [left, right];
       player.handSynergy = left.synergy[right.lane][right.name];
+      player.handDelta = left.delta[right.lane][right.name];
       if (index === bigBlind) player.pot += 10;
       if (index === smallBlind) player.pot += 5;
     });
@@ -218,9 +233,16 @@ class Game {
     this.sendTurn();
   }
 
-  sendTurn() {
-    const playersData = this.players.map(({ bank, pot, state }) => {
-      return { bank: bank - pot, pot, state };
+  sendTurn(startTick = true) {
+    const validStates = [
+      "zeroth card",
+      "first card",
+      "second card",
+      "third card",
+    ];
+    if (!validStates.includes(this.state)) return;
+    const playersData = this.players.map(({ bank, pot, state, name }) => {
+      return { bank: bank - pot, pot, state, name };
     });
 
     this.players.forEach((player, index) => {
@@ -233,6 +255,8 @@ class Game {
           name,
           leftPoints: left.synergy[lane][name],
           rightPoints: right.synergy[lane][name],
+          leftDelta: left.delta[lane][name],
+          rightDelta: right.delta[lane][name],
         };
       });
 
@@ -245,6 +269,7 @@ class Game {
         playersData,
         playerHand: player.hand,
         synergy: player.handSynergy,
+        delta: player.handDelta,
         index,
         score: player.score,
         winchance: player.winchance,
@@ -260,7 +285,8 @@ class Game {
       switch (player.state) {
         case "current turn":
           if (minBet === 0) {
-            UI.leftButton = "check";
+            UI.leftButton = "fold";
+            UI.middleButton = "check";
             UI.rightButton = "raise";
           } else if (allIn) {
             UI.leftButton = "fold";
@@ -273,9 +299,9 @@ class Game {
           break;
         case "finished turn":
         case "waiting turn":
-          UI.leftButton = "check any";
-          UI.middleButton = "call any";
-          UI.rightButton = "fold any";
+          UI.leftButton = "fold any";
+          UI.middleButton = "check any";
+          UI.rightButton = "call any";
           break;
         case "folded":
         case "all in":
@@ -285,7 +311,7 @@ class Game {
 
       player.socket.send(JSON.stringify(UI));
 
-      if (player.state !== "current turn") return;
+      if (player.state !== "current turn" || !startTick) return;
 
       player.timeLeft = 30;
       let activePlayer = this.players.map(
@@ -334,9 +360,19 @@ class Game {
 
       tickFunction();
     });
+
+    //CALM: send spectators
   }
 
   nextPlayer(player) {
+    const validStates = [
+      "zeroth card",
+      "first card",
+      "second card",
+      "third card",
+    ];
+    if (!validStates.includes(this.state)) return;
+
     this.players.forEach(({ exitTick }) => exitTick && exitTick());
 
     let notFolded = 0;
@@ -346,7 +382,9 @@ class Game {
 
     const potChopped = notFolded === 1;
     if (potChopped) {
+      this.state = "chopped";
       this.settlePots();
+      this.players.forEach((player) => (player.state = "folded"));
       this.sendFinished();
       return;
     }
@@ -377,7 +415,7 @@ class Game {
 
     let drawnChamp;
     switch (this.state) {
-      case "first bet":
+      case "zeroth card":
         drawnChamp = this.deck[2].pop();
         while (!this.isLegalDraw(drawnChamp)) drawnChamp = this.deck[2].pop();
         this.board.push(drawnChamp);
@@ -396,9 +434,9 @@ class Game {
         this.state = "third card";
         break;
       case "third card":
+        this.state = "finished";
         this.settlePots();
         this.sendFinished();
-        this.state = "finished";
         return;
     }
 
@@ -413,8 +451,10 @@ class Game {
     this.nextPlayer(player);
   }
 
+  // CALM: when players leave they needs to be stored somewhere to be added back into the list as a folded player, their pot will be settled. The player will then be cleaned after. The cleaning needs to happen before the game starts.
   settlePots() {
-    // 1) Reset winners, adjust banks, compute min/max scores
+    if (!["finished", "chopped"].includes(this.state)) return;
+    // Reset winners, adjust banks, compute min/max scores
     let minScore = Infinity,
       maxScore = -Infinity;
     this.players.forEach((p) => {
@@ -423,46 +463,45 @@ class Game {
       maxScore = Math.max(maxScore, p.score);
     });
 
-    // 2) Compute alphas
-    this.players.forEach((p) => {
-      p.alpha = (p.score - minScore) / (maxScore - minScore);
-    });
+    // Compute alphas
+    const deltaScore = maxScore - minScore;
+    this.players.forEach((p) => (p.alpha = (p.score - minScore) / deltaScore));
 
-    // 3) Capture each player’s original pot, deduct from their bank, then zero it
+    // Capture each player’s original pot, deduct from their bank, then zero it
     const origPots = this.players.map((p) => p.pot);
     this.players.forEach((p, i) => {
       p.bank -= origPots[i];
       p.pot = 0;
     });
 
-    // 4) Sort the unique positive bet‐levels
+    // Sort the unique positive bet‐levels
     const levels = Array.from(new Set(origPots.filter((x) => x > 0))).sort(
       (a, b) => a - b
     );
 
-    // 5) For each “layer” between levels, build & award the side‐pot
+    // For each “layer” between levels, build & award the side‐pot
     let prev = 0;
     for (const lvl of levels) {
       const sliceSize = lvl - prev;
 
-      // 5a) Who contributed at least this much?
+      // Who contributed at least this much?
       const participants = this.players.filter((_, i) => origPots[i] >= lvl);
 
-      // 5b) Total chips in this slice
+      // Total chips in this slice
       const subPot = sliceSize * participants.length;
 
-      // 5c) Who’s actually contesting? (folded players contributed but can’t win)
+      // Who’s actually contesting? (folded players contributed but can’t win)
       const contenders = participants.filter((p) => p.state !== "folded");
       if (contenders.length === 0) {
         prev = lvl;
         continue;
       }
 
-      // 5d) Find the top score among contenders
+      // Find the top score among contenders
       const best = Math.max(...contenders.map((p) => p.score));
       const winners = contenders.filter((p) => p.score === best);
 
-      // 5e) Split subPot evenly, assign remainders to earliest winners
+      // Split subPot evenly, assign remainders to earliest winners
       const share = Math.floor(subPot / winners.length);
       const remainder = subPot % winners.length;
       winners.forEach((p, i) => {
@@ -474,10 +513,11 @@ class Game {
     }
   }
 
-  sendFinished() {
-    console.log("sendfinished");
+  sendFinished(restart = true) {
+    if (!["finished", "chopped"].includes(this.state)) return;
+
     const playersData = this.players.map(
-      ({ hand, winner, score, bank, alpha }) => {
+      ({ hand, winner, score, bank, alpha, state, name }) => {
         const [left, right] = hand;
         const leftPoints = [left.points];
         const rightPoints = [right.points];
@@ -495,9 +535,15 @@ class Game {
           rightPoints,
           synergy,
           score,
-          alpha,
+          alpha: this.state === "chopped" ? 0 : alpha,
           bank,
-          state: winner ? "current turn" : "waiting turn",
+          name,
+          state: winner
+            ? "current turn"
+            : state === "folded"
+            ? "folded"
+            : "waiting turn",
+          unshow: state === "folded",
         };
       }
     );
@@ -511,7 +557,6 @@ class Game {
           rightPoints: right.synergy[lane][name],
         };
       });
-      // CALM: Folded Players should have the option to show
       player.socket.send(
         JSON.stringify({
           playersData,
@@ -519,16 +564,20 @@ class Game {
           synergy: player.handSynergy,
           index,
           score: player.score,
-          alpha: player.alpha,
+          alpha: this.state === "chopped" ? 0 : player.alpha,
           board,
           finished: true,
           pot: this.pot,
           lanes: this.pickOrder,
+          leftButton: playersData[index].unshow ? "show" : "",
         })
       );
     });
 
-    //CALM: Timeout needs to be cleared if the game can't continue due to leaving during the wait.
+    //CALM: send spectators
+
+    if (!restart) return;
+
     setTimeout(() => {
       this.players.forEach((player) => {
         if (player.bank >= 10) return;
@@ -536,8 +585,8 @@ class Game {
         player.bank = Math.round(player.maxBuyIn);
         player.maxBuyIn = Math.max((player.maxBuyIn * 2) / 3, 10);
       });
-      //CALM: Kick players with <10 money to spectator
       if (this.players.length < 2) return true; //CALM: reset to queuing lobby
+      this.state = "ready up";
       this.startGame();
     }, 7500);
   }
@@ -708,6 +757,7 @@ class Player {
     this.socket = socket;
     this.bank = 1000;
     this.pot = 0;
+    this.name = "&nbsp;";
   }
 }
 

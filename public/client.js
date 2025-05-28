@@ -5,9 +5,62 @@ slider.addEventListener("input", (e) => {
   document.documentElement.style.setProperty("--u", `min(${n}dvh, ${n}dvw)`);
 });
 
+const send = (data) => ws.send(JSON.stringify(data));
+
+function debounce(callback, delay) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => callback.apply(this, args), delay);
+  };
+}
+
+const username = document.getElementById("username");
+
+username.addEventListener(
+  "input",
+  debounce((event) => {
+    send({ type: "name", name: event.target.value });
+  }, 300)
+);
+
+const winrateTooltip = (element, { name, lane, points, winrate }) => {
+  const imageSpan = document.createElement("span");
+  const image = document.createElement("img");
+  image.src = championImage(name);
+  imageSpan.append(image);
+
+  const laneSpan = document.createElement("span");
+  const imageLane = document.createElement("img");
+  imageLane.src = laneImage(lane);
+  laneSpan.append(imageLane);
+
+  const pointSpan = document.createElement("span");
+  pointSpan.innerText = "◊" + points;
+  alphaToShimmer(pointSpan, points / 4);
+
+  const toolTip = pSpan`${laneSpan} ${imageSpan} earns ${pointSpan} points because they have a ${(
+    winrate * 100
+  ).toFixed(2)}% winrate.`;
+
+  toolTip.classList.add("tooltip");
+  element.append(toolTip);
+};
+
+function pSpan(strings, ...values) {
+  const p = document.createElement("p");
+  strings.forEach((text, i) => {
+    // append the literal chunk (even if it’s just “ ”)
+    p.append(text);
+    // then append the corresponding value (if any)
+    if (i < values.length) p.append(values[i]);
+  });
+  return p;
+}
+
 // --- WebSocket Connection ---
 const protocol = location.protocol === "https:" ? "wss" : "ws";
-//const ws = new WebSocket(`${protocol}://${location.host}`);
+const ws = new WebSocket(`${protocol}://${location.host}`);
 
 ws.addEventListener("open", () => {
   console.log("🟢 Connected to server");
@@ -33,7 +86,7 @@ ws.addEventListener("message", (event) => {
           // auto reset after 2 seconds
           playerTimer.style.width = `0px`;
           playerTimer.innerText = "";
-        }, 1100);
+        }, 1250);
         return;
       }
 
@@ -42,7 +95,7 @@ ws.addEventListener("message", (event) => {
       for (let oppIndex = 0; oppIndex < order.length; oppIndex++) {
         const trueIndex = (oppIndex + 1 + data.index) % playerCount;
         if (!data.activePlayer[trueIndex]) continue;
-        const timer = order[oppIndex].querySelector(".timer");
+        const timer = order[oppIndex].hand.querySelector(".timer");
         timer.style.width = Math.floor((data.timeLeft / 30) * 100) + "%";
 
         setTimeout(() => {
@@ -67,11 +120,7 @@ const leftButton = document.getElementById("left-button");
 const middleButton = document.getElementById("middle-button");
 const rightButton = document.getElementById("right-button");
 
-const playerHand = document.getElementById("player-hand");
-const [leftCard, rightCard] = playerHand.querySelectorAll(".card");
 const playerTimer = document.querySelector(".control .timer");
-const synergy = document.getElementById("synergy");
-
 const handInfo = document.getElementById("info");
 const percentBorder = document.getElementById("percent");
 const percentFill = document.getElementById("fill");
@@ -79,11 +128,40 @@ const handScore = document.getElementById("score");
 const handChance = document.getElementById("chance");
 const toBet = document.getElementById("bet");
 
-const topLeft = document.getElementById("top-left");
-const topMiddle = document.getElementById("top-middle");
-const topRight = document.getElementById("top-right");
-const middleLeft = document.getElementById("middle-left");
-const middleRight = document.getElementById("middle-right");
+const buildHand = (handID) => {
+  const hand = document.getElementById(handID);
+  const cards = hand.querySelectorAll(".card");
+  const boardScore = Array.from(hand.querySelectorAll(".matrixRow")).map(
+    (row) => {
+      return row.querySelectorAll(".holePoint");
+    }
+  );
+  return {
+    hand,
+    name: hand.querySelector(".name"),
+    bank: hand.querySelector(".bank"),
+    totalScore: hand.querySelector(".totalScore"),
+
+    firstCard: cards[0],
+    secondCard: cards[1],
+
+    //These are a list of 3 divs
+    holeScore: hand.querySelectorAll(".holeScore > .holePoint"),
+    firstBoardScore: boardScore[0],
+    secondBoardScore: boardScore[1],
+  };
+};
+
+const playerHand = buildHand("player-hand");
+const topLeft = buildHand("top-left");
+const topMiddle = buildHand("top-middle");
+const topRight = buildHand("top-right");
+const middleLeft = buildHand("middle-left");
+const middleRight = buildHand("middle-right");
+
+const board = document.getElementById("board");
+const boardCards = board.querySelectorAll(".card");
+const pot = board.querySelector(".opponentBet");
 
 const opponentOrder = {
   2: [topMiddle],
@@ -92,11 +170,6 @@ const opponentOrder = {
   5: [middleLeft, topLeft, topRight, middleRight],
   6: [middleLeft, topLeft, topMiddle, topRight, middleRight],
 };
-
-const board = document.getElementById("board");
-const boardCards = board.querySelectorAll(".card");
-const pot = board.querySelector(".opponentBet");
-const lanes = document.getElementById("lanes");
 
 //raise elements
 
@@ -111,12 +184,18 @@ const pointsToClass = {
   7: "four",
 };
 
+const removeShimmer = (element) => {
+  element.classList.remove("shimmer");
+  element.style.backgroundImage = "none";
+  element.style.backgroundColor = "#02010600";
+};
+
 const alphaToShimmer = (element, alpha) => {
-  if (alpha > 1) alpha *= 2/3;
+  if (alpha > 1) alpha *= 2 / 3;
   const hue = 150 + alpha * 150;
   const baseChroma = 0.05 + alpha * 0.1;
   const liteChroma = baseChroma - alpha * 0.1;
-  const liteLum = Math.min(0.7 + alpha * 0.2, 0.90);
+  const liteLum = Math.min(0.7 + alpha * 0.2, 0.9);
   element.style.backgroundImage = `
     linear-gradient(
       60deg,
@@ -161,96 +240,73 @@ const stateClassList = Object.values(stateToClass);
 // --- Update Functions ---
 function updatePlayerHand(data) {
   if (data.playerHand === undefined) {
-    playerHand.style.display = "none";
+    playerHand.hand.style.display = "none";
     percentBorder.style.border = "0px solid black";
     handInfo.style.display = "none";
     toBet.innerText = "";
     toBet.classList.add("noBet");
-    topLeft.style.display = "none";
-    topMiddle.style.display = "none";
-    topRight.style.display = "none";
-    middleLeft.style.display = "none";
-    middleRight.style.display = "none";
+    topLeft.hand.style.display = "none";
+    topMiddle.hand.style.display = "none";
+    topRight.hand.style.display = "none";
+    middleLeft.hand.style.display = "none";
+    middleRight.hand.style.display = "none";
 
+    board.style.display = "none";
     boardCards.forEach((card) => {
       card.innerHTML = "";
       card.classList.add("noCard");
     });
 
     pot.querySelector("p").innerText = "";
-    lanes.innerHTML = "";
 
     return;
   }
 
-  playerHand.style.display = "flex";
-  leftCard.innerHTML = "";
-  rightCard.innerHTML = "";
-  synergy.innerHTML = "";
+  playerHand.hand.style.display = "flex";
+  playerHand.holeScore.forEach((e) => (e.innerHTML = ""));
+  playerHand.firstBoardScore.forEach((e) => (e.innerHTML = ""));
+  playerHand.secondBoardScore.forEach((e) => (e.innerHTML = ""));
 
   const playerPotData = data.playersData[data.index];
-  const playerPot = document.createElement(data.finished ? "span" : "p");
-  if (data.finished) {
-    playerPot.innerHTML = `◊${data.score}`;
-    alphaToShimmer(playerPot, data.alpha);
-  } else playerPot.innerHTML = `&nbsp;`;
-
-  const playerScore = document.createElement("p");
-  if (data.finished) playerScore.innerHTML = `¢${playerPotData.bank}`;
-  else playerScore.innerHTML = `¢${playerPotData.bank}`;
+  playerHand.bank.innerHTML = `¢${playerPotData.bank}`;
+  playerHand.totalScore.innerHTML = `◊${data.score}`;
+  removeShimmer(playerHand.totalScore);
+  if (data.finished) alphaToShimmer(playerHand.totalScore, data.alpha);
 
   const [left, right] = data.playerHand;
+  playerHand.holeScore[0].innerText = left.points;
+  alphaToShimmer(playerHand.holeScore[0], left.points / 4);
+  winrateTooltip(playerHand.holeScore[0], left);
 
-  if (data.finished && false) {
-    const leftImage = document.createElement("img");
-    leftImage.src = championImage(data.playersData[data.index].left.name);
-    const leftP = document.createElement("p");
-    data.playersData[data.index].leftPoints.forEach((point) => {
-      const leftPoints = document.createElement("span");
-      leftPoints.classList.add(pointsToClass[point]);
-      leftPoints.innerText = "" + point;
-      leftP.append(leftPoints);
-    });
-    leftCard.append(leftImage, leftP);
+  playerHand.holeScore[1].innerText = data.synergy;
+  alphaToShimmer(playerHand.holeScore[1], data.synergy / 4);
 
-    const rightImage = document.createElement("img");
-    rightImage.src = championImage(data.playersData[data.index].right.name);
-    const rightP = document.createElement("p");
-    data.playersData[data.index].rightPoints.forEach((point) => {
-      const rightPoints = document.createElement("span");
-      rightPoints.classList.add(pointsToClass[point]);
-      rightPoints.innerText = "" + point;
-      rightP.append(rightPoints);
-    });
-    rightCard.append(rightImage, rightP);
-  } else {
-    const leftImage = document.createElement("img");
-    leftImage.src = championImage(left.name);
-    const leftText = document.createElement("p");
-    const leftPoints = document.createElement("span");
-    alphaToShimmer(leftPoints, left.points / 4);
-    leftPoints.innerText = "" + left.points;
-    leftText.appendChild(leftPoints);
-    leftCard.append(leftImage, leftText);
+  playerHand.holeScore[2].innerText = right.points;
+  alphaToShimmer(playerHand.holeScore[2], right.points / 4);
+  winrateTooltip(playerHand.holeScore[2], right);
 
-    const rightImage = document.createElement("img");
-    rightImage.src = championImage(right.name);
-    const rightText = document.createElement("p");
-    const rightPoints = document.createElement("span");
-    alphaToShimmer(rightPoints, right.points / 4);
-    rightPoints.innerText = "" + right.points;
-    rightText.appendChild(rightPoints);
-    rightCard.append(rightImage, rightText);
-  }
 
-  stateClassList.forEach((state) => leftCard.classList.remove(state));
-  leftCard.classList.add(stateToClass[playerPotData.state]);
-  stateClassList.forEach((state) => rightCard.classList.remove(state));
-  rightCard.classList.add(stateToClass[playerPotData.state]);
-  const handSynergy = document.createElement("span");
-  alphaToShimmer(handSynergy, data.synergy / 4);
-  handSynergy.innerText = data.synergy;
-  synergy.append(playerPot, playerScore, handSynergy);
+  console.log(left.winrate, data.delta, right.winrate);
+
+  playerHand.firstCard.innerHTML = "";
+  const leftImage = document.createElement("img");
+  leftImage.src = championImage(left.name);
+  playerHand.firstCard.append();
+  const leftLaneImage = document.createElement("img");
+  leftLaneImage.src = championImage(data.lanes[0]);
+  leftLaneImage.classList.add("champLane");
+  playerHand.firstCard.append(leftImage, leftLaneImage);
+
+  playerHand.secondCard.innerHTML = "";
+  const rightImage = document.createElement("img");
+  rightImage.src = championImage(right.name);
+  const rightLaneImage = document.createElement("img");
+  rightLaneImage.src = championImage(data.lanes[1]);
+  rightLaneImage.classList.add("champLane");
+  playerHand.secondCard.append(rightImage, rightLaneImage);
+
+  stateClassList.forEach((state) => playerHand.hand.classList.remove(state));
+  playerHand.hand.classList.add(stateToClass[playerPotData.state]);
 
   if (data.finished) {
     handInfo.style.display = "none";
@@ -273,146 +329,141 @@ function updatePlayerHand(data) {
       toBet.innerText = ``;
       toBet.classList.add("noBet");
     } else {
+      console.log(data.minBet);
       toBet.innerText = `¢${data.minBet}`;
       toBet.classList.remove("noBet");
     }
   }
 
   opponentOrder[6].forEach((opponent) => {
-    opponent.style.display = "none";
+    opponent.hand.style.display = "none";
   });
 
   const order = opponentOrder[data.playersData.length];
   for (let opponentIndex = 0; opponentIndex < order.length; opponentIndex++) {
-    const opponent = order[opponentIndex];
-    opponent.style.display = "flex";
-    const [leftCard, rightCard] = opponent.querySelectorAll(".card");
-    leftCard.innerHTML = "";
-    rightCard.innerHTML = "";
-
     const trueIndex =
       (opponentIndex + 1 + data.index) % data.playersData.length;
+    const opData = data.playersData[trueIndex];
+    const opponent = order[opponentIndex];
+    opponent.hand.style.display = "flex";
+    stateClassList.forEach((state) => opponent.hand.classList.remove(state));
+    opponent.hand.classList.add(stateToClass[opData.state]);
 
-    stateClassList.forEach((state) => leftCard.classList.remove(state));
-    stateClassList.forEach((state) => rightCard.classList.remove(state));
+    opponent.totalScore.innerHTML = "";
+    opponent.holeScore.forEach((s) => (s.innerText = ""));
+    opponent.firstBoardScore.forEach((s) => (s.innerText = ""));
+    opponent.secondBoardScore.forEach((s) => (s.innerText = ""));
 
-    leftCard.classList.add(stateToClass[data.playersData[trueIndex].state]);
-    rightCard.classList.add(stateToClass[data.playersData[trueIndex].state]);
-
-    const bet = opponent.querySelector(".opponentBet");
+    opponent.bank.innerHTML = `¢${opData.bank}`;
+    opponent.name.innerHTML = opData.name;
 
     if (data.finished) {
-      const synergyPoint = document.createElement("div");
-      data.playersData[trueIndex].leftPoints.forEach((point, index) => {
-        if (index === 0) return;
+      if (!opData.unshow) {
+        opponent.holeScore[0].innerText = opData.leftPoints[0];
+        alphaToShimmer(opponent.holeScore[0], opData.leftPoints[0] / 4);
 
-        const leftPoints = document.createElement("span");
-        alphaToShimmer(leftPoints, point / 4);
-        leftPoints.innerText = "" + point;
-        synergyPoint.append(leftPoints);
-      });
+        opponent.holeScore[1].innerText = opData.synergy;
+        alphaToShimmer(opponent.holeScore[1], opData.synergy / 4);
 
-      const synergy = document.createElement("span");
-      const point = data.playersData[trueIndex].synergy;
-      alphaToShimmer(synergy, point / 4);
+        opponent.holeScore[2].innerText = opData.rightPoints[0];
+        alphaToShimmer(opponent.holeScore[2], opData.rightPoints[0] / 4);
 
-      synergy.innerText = "" + point;
-      synergyPoint.append(synergy);
+        opData.leftPoints.forEach((point, index) => {
+          if (index === 0) return;
+          alphaToShimmer(opponent.firstBoardScore[index - 1], point / 4);
+          opponent.firstBoardScore[index - 1].innerText = "" + point;
+        });
 
-      data.playersData[trueIndex].rightPoints.forEach((point, index) => {
-        if (index === 0) return;
-
-        const rightPoints = document.createElement("span");
-        alphaToShimmer(rightPoints, point / 4);
-        rightPoints.innerText = "" + point;
-        synergyPoint.append(rightPoints);
-      });
-
-      synergyPoint.style.width = "100%";
-      synergyPoint.style.display = "flex";
-      synergyPoint.style.justifyContent = "space-evenly";
-
-      const textSynergy = document.createElement("p");
-      textSynergy.innerHTML = `¢${data.playersData[trueIndex].bank}`;
-      textSynergy.style.margin = "0px";
-
-      const text = document.createElement("span");
-      text.innerHTML = `◊${data.playersData[trueIndex].score}`;
-      alphaToShimmer(text, data.playersData[trueIndex].alpha);
-      bet.innerHTML = "";
-      text.style.margin = "0px";
-      bet.append(synergyPoint, textSynergy, text); //
-      bet.style.width = "100%";
-    } else {
-      bet.innerHTML = "";
-      bet.innerText = `¢${data.playersData[trueIndex].bank}`;
+        opData.rightPoints.forEach((point, index) => {
+          if (index === 0) return;
+          alphaToShimmer(opponent.secondBoardScore[index - 1], point / 4);
+          opponent.secondBoardScore[index - 1].innerText = "" + point;
+        });
+        opponent.totalScore.innerHTML = `◊${opData.score}`;
+        alphaToShimmer(opponent.totalScore, opData.alpha);
+      }
     }
 
-    if (data.finished) {
+    opponent.firstCard.innerHTML = "";
+    opponent.secondCard.innerHTML = "";
+
+    if (data.finished && !data.playersData[trueIndex].unshow) {
+      opponent.firstCard.innerHTML = "";
+      opponent.secondCard.innerHTML = "";
       const leftImage = document.createElement("img");
       leftImage.src = championImage(data.playersData[trueIndex].left.name);
-      const leftP = document.createElement("p");
-      data.playersData[trueIndex].leftPoints.forEach((point, index) => {
-        if (index != 0) return;
-        const leftPoints = document.createElement("span");
-        alphaToShimmer(leftPoints, point / 4);
-        leftPoints.innerText = "" + point;
-        leftP.append(leftPoints);
-      });
-      leftCard.append(leftImage, leftP);
+      opponent.firstCard.append(leftImage);
 
       const rightImage = document.createElement("img");
       rightImage.src = championImage(data.playersData[trueIndex].right.name);
-      const rightP = document.createElement("p");
-      data.playersData[trueIndex].rightPoints.forEach((point, index) => {
-        if (index != 0) return;
-        const rightPoints = document.createElement("span");
-        alphaToShimmer(rightPoints, point / 4);
-        rightPoints.innerText = "" + point;
-        rightP.append(rightPoints);
-      });
-      rightCard.append(rightImage, rightP);
+      opponent.secondCard.append(rightImage);
     }
   }
 
+  board.style.display = "flex";
   pot.querySelector("p").innerText = `POT ¢${data.pot}`;
-  lanes.innerHTML = "";
 
-  data.lanes.forEach((lane, index) => {
-    const image = document.createElement("img");
-    image.src = laneImage(lane);
-    if (index - 2 < data.board.length) image.classList.add("activeLane");
-    else image.classList.add("inactiveLane");
-    lanes.append(image);
-  });
-
-  boardCards.forEach((card) => {
+  boardCards.forEach((card, index) => {
     card.innerHTML = "";
-    card.classList.add("noCard");
-  });
+    card.classList.remove("noCard");
 
-  data.board.forEach((champ, index) => {
-    boardCards[index].innerHTML = "";
-    boardCards[index].classList.remove("noCard");
-    const image = document.createElement("img");
-    image.src = championImage(champ.name);
-    const leftPoints = document.createElement("span");
-    alphaToShimmer(leftPoints, champ.leftPoints / 4);
-    leftPoints.innerText = "" + champ.leftPoints;
+    if (index < data.board.length) {
+      const champ = data.board[index];
+      const image = document.createElement("img");
+      image.src = championImage(champ.name);
+      const laneImage = document.createElement("img");
+      laneImage.src = championImage(data.lanes[2 + index]);
+      laneImage.classList.add("boardLane");
+      card.append(image, laneImage);
 
-    const rightPoints = document.createElement("span");
-    alphaToShimmer(rightPoints, champ.rightPoints / 4);
-    rightPoints.innerText = "" + champ.rightPoints;
-
-    const p = document.createElement("p");
-    p.append(leftPoints, rightPoints);
-
-    if (data.finished && false) boardCards[index].append(image);
-    else boardCards[index].append(image, p);
+      playerHand.firstBoardScore[index].innerText = champ.leftPoints;
+      alphaToShimmer(playerHand.firstBoardScore[index], champ.leftPoints / 4);
+      playerHand.secondBoardScore[index].innerText = champ.rightPoints;
+      alphaToShimmer(playerHand.secondBoardScore[index], champ.rightPoints / 4);
+    } else {
+      const laneImage = document.createElement("img");
+      laneImage.src = championImage(data.lanes[2 + index]);
+      laneImage.classList.add("dimLane");
+      card.append(laneImage);
+    }
   });
 }
 
+const clear = () => {
+  leftButton.classList.add("noButton");
+  middleButton.classList.add("noButton");
+  rightButton.classList.add("noButton");
+  leftButtonState = "";
+  middleButtonState = "";
+  rightButtonState = "";
+};
+
 function updateButtons(data) {
+  if (
+    data.middleButton === "check" &&
+    (leftButtonState === "unfold any" ||
+      middleButtonState === "uncheck any" ||
+      rightButtonState === "uncall any")
+  ) {
+    clear();
+    return setTimeout(() => send({ type: "check" }), 250);
+  }
+
+  if (data.leftButton === "fold" && leftButtonState === "unfold any") {
+    clear();
+    return setTimeout(() => send({ type: "fold" }), 250);
+  }
+
+  if (data.rightButton === "call" && rightButtonState === "uncall any") {
+    clear();
+    return setTimeout(() => send({ type: "call" }), 250);
+  }
+
+  if (data.rightButton === "all in" && rightButtonState === "uncall any") {
+    clear();
+    return setTimeout(() => send({ type: "all in" }), 250);
+  }
+
   updateLeftButton(data.leftButton, data);
   updateMiddleButton(data.middleButton, data);
   updateRightButton(data.rightButton, data);
@@ -426,29 +477,29 @@ leftButton.addEventListener("click", (e) => {
 
   switch (leftButtonState) {
     case "ready up":
-      return ws.send(JSON.stringify({ type: "ready up" }));
+      return send({ type: "ready up" });
     case "queue up":
-      return ws.send(JSON.stringify({ type: "queue up" }));
+      return send({ type: "queue up" });
     case "unready":
-      return ws.send(JSON.stringify({ type: "unready" }));
+      return send({ type: "unready" });
     case "unqueue":
-      return ws.send(JSON.stringify({ type: "unqueue" }));
-    case "check":
-      return ws.send(JSON.stringify({ type: "check" }));
+      return send({ type: "unqueue" });
     case "fold":
-      return ws.send(JSON.stringify({ type: "fold" }));
-    case "check any":
-      leftButton.classList.add("activeButton");
-      leftButtonState = "uncheck any";
-      middleButton.classList.remove("activeButton");
-      middleButtonState = "call any";
+      return send({ type: "fold" });
+    case "fold any":
       rightButton.classList.remove("activeButton");
-      rightButtonState = "fold any";
+      rightButtonState = "call any";
+      middleButton.classList.remove("activeButton");
+      middleButtonState = "check any";
+      leftButton.classList.add("activeButton");
+      leftButtonState = "unfold any";
       break;
-    case "uncheck any":
+    case "unfold any":
       leftButton.classList.remove("activeButton");
-      leftButtonState = "check any";
+      leftButtonState = "fold any";
       break;
+    case "show":
+      return send({ type: "show" });
   }
 });
 
@@ -479,46 +530,24 @@ function updateLeftButton(state, data) {
       leftButton.innerText = data.position;
       leftButtonState = "unqueue";
       break;
-    case "check":
-      if (
-        leftButtonState === "uncheck any" ||
-        middleButtonState === "uncall any" ||
-        rightButtonState === "unfold any"
-      ) {
-        leftButton.classList.add("noButton");
-        middleButton.classList.add("noButton");
-        rightButton.classList.add("noButton");
-        leftButtonState = "";
-        middleButtonState = "";
-        rightButtonState = "";
-        return ws.send(JSON.stringify({ type: "check" }));
-      }
-      leftButton.innerText = "Check";
-      leftButtonState = "check";
+    case "show":
+      leftButton.style.position = "absolute";
+      leftButton.innerText = "Show";
+      leftButtonState = "show";
       break;
     case "fold":
-      if (rightButtonState === "unfold any") {
-        leftButton.classList.add("noButton");
-        middleButton.classList.add("noButton");
-        rightButton.classList.add("noButton");
-        leftButtonState = "";
-        middleButtonState = "";
-        rightButtonState = "";
-        return ws.send(JSON.stringify({ type: "fold" }));
-      }
-
       leftButton.innerText = "Fold";
       leftButtonState = "fold";
       break;
-    case "check any":
-      if (leftButtonState == "uncheck any") {
+    case "fold any":
+      if (leftButtonState === "unfold any") {
         leftButton.classList.add("smallText");
         leftButton.classList.add("activeButton");
         return;
       }
       leftButton.classList.add("smallText");
-      leftButton.innerText = "Pre Check";
-      leftButtonState = "check any";
+      leftButton.innerText = "Fold Any";
+      leftButtonState = "fold any";
       break;
     default:
       leftButton.classList.add("noButton");
@@ -533,22 +562,21 @@ middleButton.addEventListener("click", (e) => {
   if (e.button === 2) return; // Ignore right-clicks
 
   switch (middleButtonState) {
+    case "check":
+      return send({ type: "check" });
     case "call":
-      leftButton.classList.add("noButton");
-      middleButton.classList.add("noButton");
-      rightButton.classList.add("noButton");
-      return ws.send(JSON.stringify({ type: "call" }));
-    case "call any":
-      middleButton.classList.add("activeButton");
-      middleButtonState = "uncall any";
-      rightButton.classList.remove("activeButton");
-      rightButtonState = "fold any";
+      return send({ type: "call" });
+    case "check any":
       leftButton.classList.remove("activeButton");
-      leftButtonState = "check any";
+      leftButtonState = "fold any";
+      middleButton.classList.add("activeButton");
+      middleButtonState = "uncheck any";
+      rightButton.classList.remove("activeButton");
+      rightButtonState = "call any";
       break;
-    case "uncall any":
+    case "uncheck any":
       middleButton.classList.remove("activeButton");
-      middleButtonState = "call any";
+      middleButtonState = "check any";
       break;
   }
 });
@@ -559,30 +587,24 @@ function updateMiddleButton(state, data) {
   middleButton.classList.remove("smallText");
   middleButton.classList.remove("activeButton");
   switch (state) {
+    case "check":
+      middleButton.innerText = "Check";
+      middleButtonState = "check";
+      break;
     case "call":
-      if (middleButtonState === "uncall any") {
-        leftButton.classList.add("noButton");
-        middleButton.classList.add("noButton");
-        rightButton.classList.add("noButton");
-        leftButtonState = "";
-        middleButtonState = "";
-        rightButtonState = "";
-        return ws.send(JSON.stringify({ type: "call" }));
-      }
       middleButton.classList.add("smallText");
       middleButton.innerText = `Call ¢${data.minBet}`;
       middleButtonState = "call";
       break;
-    case "call any":
-      if (middleButtonState == "uncall any") {
+    case "check any":
+      if (middleButtonState == "uncheck any") {
         middleButton.classList.add("smallText");
         middleButton.classList.add("activeButton");
         return;
       }
-
       middleButton.classList.add("smallText");
-      middleButton.innerText = "Call Any";
-      middleButtonState = "call any";
+      middleButton.innerText = "Pre Check";
+      middleButtonState = "check any";
       break;
     default:
       middleButton.classList.add("noButton");
@@ -631,8 +653,8 @@ incrementButtons.forEach((button, index) => {
   if (index >= incrementSizes.length)
     // Confirm button
     return button.addEventListener("click", () => {
-      if (raise > minRaise) ws.send(JSON.stringify({ type: "raise", raise }));
-      else ws.send(JSON.stringify({ type: "call" }));
+      if (raise > minRaise) send({ type: "raise", raise });
+      else send({ type: "call" });
     });
 
   function doRaise() {
@@ -683,20 +705,20 @@ rightButton.addEventListener("click", (e) => {
       rightButtonState = "raise";
       raisePanel.style.display = "none";
       break;
-    case "fold any":
-      rightButton.classList.add("activeButton");
-      rightButtonState = "unfold any";
+    case "call any":
       middleButton.classList.remove("activeButton");
-      middleButtonState = "call any";
+      middleButtonState = "check any";
+      rightButton.classList.add("activeButton");
+      rightButtonState = "uncall any";
       leftButton.classList.remove("activeButton");
-      leftButtonState = "check any";
+      leftButtonState = "fold any";
       break;
-    case "unfold any":
+    case "uncall any":
       rightButton.classList.remove("activeButton");
-      rightButtonState = "fold any";
+      rightButtonState = "call any";
       break;
     case "all in":
-      return ws.send(JSON.stringify({ type: "all in" }));
+      return send({ type: "all in" });
   }
 });
 
@@ -715,26 +737,17 @@ function updateRightButton(state, data) {
       minRaise = data.minBet;
       maxRaise = data.playersData[data.index].bank;
       break;
-    case "fold any":
-      if (rightButtonState === "unfold any") {
+    case "call any":
+      if (rightButtonState == "uncall any") {
         rightButton.classList.add("smallText");
         rightButton.classList.add("activeButton");
         return;
       }
       rightButton.classList.add("smallText");
-      rightButton.innerText = "Fold Any";
-      rightButtonState = "fold any";
+      rightButton.innerText = "Call Any";
+      rightButtonState = "call any";
       break;
     case "all in":
-      if (middleButtonState === "uncall any") {
-        leftButton.classList.add("noButton");
-        middleButton.classList.add("noButton");
-        rightButton.classList.add("noButton");
-        leftButtonState = "";
-        middleButtonState = "";
-        rightButtonState = "";
-        return ws.send(JSON.stringify({ type: "all in" }));
-      }
       rightButton.classList.add("smallText");
       rightButton.innerText = "All In";
       rightButtonState = "all in";

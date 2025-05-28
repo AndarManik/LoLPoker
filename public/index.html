@@ -10,7 +10,7 @@
       }
 
       * {
-        color: oklch(0.85 0.0125 225);
+        color: oklch(0.8 0.0125 225);
         user-select: none;
         box-sizing: border-box;
       }
@@ -18,6 +18,13 @@
       @font-face {
         font-family: "Beaufort";
         src: url("/fonts/BeaufortforLOL-Bold.ttf") format("truetype");
+      }
+
+      html,
+      body {
+        overflow: hidden;
+        height: 100%;
+        touch-action: none; /* Prevents scrolling and gestures */
       }
 
       body {
@@ -45,19 +52,14 @@
           #010a13 100%
         );
         border: calc(var(--u) / 16) solid #785a28;
-        border-radius: 2rem;
-        padding: 2rem;
+        border-radius: calc(var(--u) / 2);
       }
 
-      #board,
-      .opponent {
+      #board {
         display: flex;
-        gap: calc(var(--u) / 32);
-      }
-
-      .opponent {
-        position: relative;
-        justify-content: center;
+        background-color: #020106;
+        border: calc(var(--u) / 48) solid oklch(0.5 0.025 230);
+        border-radius: calc(var(--u) / 16);
       }
 
       #board {
@@ -68,15 +70,78 @@
         justify-content: center;
       }
 
-      #player-hand {
+      .hand {
+        position: relative;
+        width: calc(var(--u) * 2.5);
+        height: calc(var(--u) * 2);
+        padding: calc(var(--u) / 32) 0;
+        padding-bottom: calc(var(--u) / 4);
+        font-size: calc(var(--u) / 4.5);
+        background-color: #020106;
+        border: calc(var(--u) / 48) solid oklch(0.5 0.025 230);
+        border-radius: calc(var(--u) / 16);
         display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        box-sizing: border-box;
+      }
+
+      .totalScore {
+        position: absolute;
+        width: calc(3 * var(--u) / 4.5);
+        bottom: calc(var(--u) / 16);
+        justify-content: center;
+        text-align: center;
+        align-items: center;
+      }
+
+      .bank {
+        position: absolute;
+        right: calc(var(--u) / 8);
+        bottom: calc(var(--u) / 16);
+        margin: 0px;
+        text-align: center;
+      }
+
+      .matrix {
+        width: 100%;
+        height: 100%;
+        display: flex;
+      }
+
+      .holeScore {
+        width: calc(3 * var(--u) / 4.5);
+        display: flex;
+        flex-direction: column;
+        gap: calc(var(--u) / 32);
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+      }
+
+      .holePoint {
+        font-size: calc(var(--u) / 4);
+      }
+
+      .crossPair {
+        width: 100%;
+      }
+
+      .matrixRow {
+        display: flex;
+        gap: calc(var(--u) / 4.5);
+        align-items: center;
+        text-align: center;
+        width: 100%;
+        height: 50%;
+      }
+
+      #player-hand {
         position: absolute;
         bottom: calc(var(--u) / 3);
         left: 50%;
         transform: translateX(-50%);
-        align-items: center;
-        justify-content: center;
-        gap: calc(var(--u) / 32);
       }
 
       #middle-left,
@@ -100,16 +165,24 @@
         left: 50%;
         transform: translateX(-50%);
         display: flex;
-        gap: calc(var(--u) * 0.5);
+        gap: calc(var(--u) / 3);
+      }
+
+      #board .card {
+        position: relative;
+        width: calc(var(--u) * 2.5 / 3);
+        height: calc(var(--u) * 2.5 / 3);
+        background-color: #020106;
+        border-radius: calc(var(--u) / 16);
+        text-align: center;
       }
 
       /* Cards */
       .card {
         position: relative;
-        width: calc(var(--u) * 0.75);
-        height: calc(var(--u) * 1.5 * 0.75);
+        width: calc(var(--u) * 0.75 * 0.9);
+        height: calc(var(--u) * 0.75 * 0.9);
         background-color: #020106;
-        border: calc(var(--u) / 48) solid #54666f;
         border-radius: calc(var(--u) / 16);
         text-align: center;
       }
@@ -139,7 +212,7 @@
         justify-content: space-evenly;
         margin: 0;
         font-size: calc(var(--u) / 4.5);
-        color: oklch(0.85 0.0125 225);
+        color: oklch(0.8 0.0125 225);
       }
 
       .card span {
@@ -154,9 +227,33 @@
 
       .card img {
         padding: 5%;
-        width: 90%;
+        width: 100%;
         aspect-ratio: 1;
         object-fit: cover;
+      }
+
+      .champLane {
+        position: absolute;
+        opacity: 0;
+        transform: translate(calc(var(--u) * -0.8 * 0.85), 0);
+      }
+
+      .champLane:hover {
+        opacity: 0.9;
+      }
+
+      .boardLane {
+        position: absolute;
+        opacity: 0;
+        transform: translate(calc(var(--u) * -0.85), 0);
+      }
+
+      .boardLane:hover {
+        opacity: 0.9;
+      }
+
+      .dimLane {
+        opacity: 0.75;
       }
 
       .noCard {
@@ -246,13 +343,13 @@
         font-weight: 600;
         font-size: calc(var(--u) / 2);
         margin-left: calc(var(--u) / 8);
-        background-color: oklch(0.85 0.0125 225);
+        background-color: oklch(0.8 0.0125 225);
         color: #010a13;
         border-radius: calc(var(--u) / 16);
       }
 
       .noBet {
-          background-color: #00000000 !important;
+        background-color: #00000000 !important;
       }
 
       #info {
@@ -399,13 +496,12 @@
         box-shadow: 0 0 calc(var(--u) / 16) #d7b96d;
       }
 
-      
       .opponentBet {
         position: absolute;
         text-align: center;
-        transform: translate(0, calc((var(--u) * 1.125)));
-        font-size: calc(var(--u) / 4.5);
-        color: oklch(0.85 0.0125 225);
+        transform: translate(0, calc((var(--u))));
+        font-size: calc(var(--u) / 4);
+        color: oklch(0.8 0.0125 225);
       }
 
       #player-hand .opponentBet {
@@ -413,7 +509,7 @@
       }
 
       .opponentBet p {
-        color: oklch(0.85 0.0125 225);
+        color: oklch(0.8 0.0125 225);
         margin: 0;
       }
 
@@ -426,7 +522,7 @@
         max-width: min(calc(100svw - var(--u)), 900px);
 
         height: calc(var(--u) / 4);
-        transform: translate(0, calc((var(--u) / -3)));
+        transform: translate(0, calc(-1.125 * (var(--u))));
         border-radius: calc((var(--u) / 32));
         text-align: center;
         font-size: calc(var(--u) / 5);
@@ -486,7 +582,7 @@
         background: linear-gradient(
           60deg,
           oklch(0.7 0.15 300) 40%,
-          oklch(0.85 0.0125 225) 50%,
+          oklch(0.8 0.0125 225) 50%,
           oklch(0.7 0.15 300) 60%
         );
         background-size: 200% 100%;
@@ -564,6 +660,75 @@
       .inactiveLane {
         opacity: 0.2;
       }
+
+      /* For WebKit browsers (Chrome, Safari, Edge) */
+      .slider::-webkit-slider-thumb {
+        background-color: #c89b3c;
+      }
+      .slider::-webkit-slider-runnable-track {
+        background-color: oklch(0.5 0.075 80);
+        border-radius: 100px;
+      }
+
+      /* For Firefox */
+      .slider::-moz-range-thumb {
+        background-color: #c89b3c;
+      }
+      .slider::-moz-range-track {
+        background-color: oklch(0.5 0.075 80);
+        border-radius: 100px;
+      }
+
+      /* For IE/Edge (legacy) */
+      .slider::-ms-thumb {
+        background-color: #c89b3c;
+      }
+      .slider::-ms-track {
+        background-color: oklch(0.5 0.075 80);
+        border-radius: 100px;
+      }
+
+      input[type="range"] {
+        accent-color: #c89b3c; /* Modern browsers (sets track & thumb color) */
+      }
+
+      /* Fine-tune for more control */
+      input[type="range"]::-webkit-slider-thumb {
+        background-color: #c89b3c; /* Thumb color (Chrome, Safari, Edge) */
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        background-color: #c89b3c; /* Thumb color (Firefox) */
+      }
+
+      input[type="range"]::-ms-thumb {
+        background-color: #c89b3c; /* Thumb color (Old IE) */
+      }
+
+      input.name {
+        width: calc(var(--u) * 2.25);
+        background: transparent;
+        border: none;
+        outline: none;
+        text-align: center;
+        color: inherit; /* optional: match text color to parent */
+        font: inherit; /* optional: inherit font styles */
+      }
+
+      .tooltip {
+        display: none;
+        background-color: #020106;
+        border: calc(var(--u) / 48) solid oklch(0.5 0.025 230);
+        position: absolute;
+        border-radius: calc(var(--u) / 16);
+        padding: calc(var(--u) / 16);
+color: white;     
+      }
+
+      .tooltip img {
+        height: calc(var(--u) / 4);
+        width: calc(var(--u) / 4);
+      }
     </style>
   </head>
   <body>
@@ -572,6 +737,7 @@
       <input
         type="range"
         style="z-index: 1000; position: fixed; left: calc(var(--u) / 4)"
+        class="slider"
         id="size-slider"
         min="0.1"
         max="20"
@@ -580,115 +746,193 @@
     </div>
     <div class="table">
       <div class="top-opponents">
-        <div id="top-left" class="opponent">
-          <div class="card currentPlayer"></div>
-          <div class="card waitingPlayer"></div>
-          <div class="opponentBet">60 | 940</div>
+        <div id="top-left" class="hand">
+          <div class="name">&nbsp;</div>
+          <div class="bank">¢970</div>
+          <div class="matrix">
+            <div class="holeScore">
+              <div class="totalScore"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+            <div class="crossPair">
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+            </div>
+          </div>
           <div class="timer"></div>
         </div>
-        <div id="top-middle" class="opponent">
-          <div class="card foldedPlayer"></div>
-          <div class="card allInPlayer"></div>
-          <div class="opponentBet">60 | 940</div>
+        <div id="top-middle" class="hand">
+          <div class="name">&nbsp;</div>
+          <div class="bank">¢970</div>
+          <div class="matrix">
+            <div class="holeScore">
+              <div class="totalScore"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+            <div class="crossPair">
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+            </div>
+          </div>
           <div class="timer"></div>
         </div>
-        <div id="top-right" class="opponent">
-          <div class="card finishedPlayer"></div>
-          <div class="card"></div>
-          <div class="opponentBet">60 | 940</div>
+        <div id="top-right" class="hand">
+          <div class="name">&nbsp;</div>
+          <div class="bank">¢970</div>
+          <div class="matrix">
+            <div class="holeScore">
+              <div class="totalScore"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+            <div class="crossPair">
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+              <div class="matrixRow">
+                <div class="card"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+                <div class="holePoint"></div>
+              </div>
+            </div>
+          </div>
           <div class="timer"></div>
         </div>
       </div>
       <div id="board">
-        <div class="card">
-          <img
-            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
-            alt=""
-          />
-          <p>
-            <span class="zero">0</span>
-            <span class="one">1</span>
-            <span class="two">3</span>
-            <span class="four">7</span>
-          </p>
-        </div>
-        <div class="card noCard"></div>
-        <div class="card noCard"></div>
-
+        <div class="card"></div>
+        <div class="card"></div>
+        <div class="card"></div>
+        <p class="tooltip">
+          <span>
+            <img src="image/TOP" />
+          </span>
+          <span>
+            <img src="image/Riven" />
+          </span>
+          with
+          <span>
+            <img src="image/TOP" />
+          </span>
+          <span>
+            <img src="image/Riven" />
+          </span>
+          earn you <span class="four">4</span> points because they have a +3% winrate delta.
+        </p>
         <div class="opponentBet">
           <p>POT 300</p>
-          <div id="lanes" style="display: flex">
-            <img
-              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png"
-              alt="Top lane icon"
-              class="activeLane"
-            />
-            <img
-              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png"
-              alt="Top lane icon"
-              class="activeLane"
-            />
-            <img
-              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png"
-              alt="Top lane icon"
-              class="activeLane"
-            />
-            <img
-              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png"
-              alt="Top lane icon"
-              class="inactiveLane"
-            />
-            <img
-              src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png"
-              alt="Top lane icon"
-              class="inactiveLane"
-            />
+        </div>
+      </div>
+
+      <div id="player-hand" class="hand">
+        <input id="username" type="text" class="name" placeholder="User Name" />
+        <div class="bank">¢970</div>
+
+        <div class="matrix">
+          <div class="holeScore">
+            <div class="totalScore">◊1</div>
+
+            <div style="color: #41b1b7" class="holePoint">1</div>
+            <div style="color: #5ea4e9" class="holePoint">2</div>
+            <div style="color: #41b1b7" class="holePoint">1</div>
+          </div>
+          <div class="crossPair">
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div style="color: #41b1b7" class="holePoint">1</div>
+              <div style="color: #5ea4e9" class="holePoint">2</div>
+              <div style="color: #41b1b7" class="holePoint">1</div>
+            </div>
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div style="color: #41b1b7" class="holePoint">1</div>
+              <div style="color: #5ea4e9" class="holePoint">2</div>
+              <div style="color: #41b1b7" class="holePoint">1</div>
+            </div>
           </div>
         </div>
       </div>
-
-      <div id="player-hand">
-        <div class="card"></div>
-        <div id="synergy" class="opponentBet">
-          <p>30 | 970</p>
-          <p>Synergy</p>
-          <p><span style="color: #ae87ed">4</span></p>
+      <div id="middle-left" class="hand">
+        <div class="name">&nbsp;</div>
+        <div class="bank">¢970</div>
+        <div class="matrix">
+          <div class="holeScore">
+            <div class="totalScore"></div>
+            <div class="holePoint"></div>
+            <div class="holePoint"></div>
+            <div class="holePoint"></div>
+          </div>
+          <div class="crossPair">
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+          </div>
         </div>
-        <div class="card"></div>
-      </div>
-
-      <div id="middle-left" class="opponent">
-        <div class="card">
-          <img
-            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
-            alt=""
-          />
-          <p>
-            <span style="color: #41b1b7">1</span>
-            <span style="color: #5ea4e9">2</span>
-            <span style="color: #41b1b7">1</span>
-            <span style="color: #5ea4e9">2</span>
-          </p>
-        </div>
-        <div class="card">
-          <img
-            src="https://www.mobachampion.com/_ipx/w_180&f_avif&q_80/imgs/champion/lowres/riven.png"
-            alt=""
-          />
-          <p>
-            <span style="color: #41b1b7">1</span>
-            <span style="color: #5ea4e9">2</span>
-            <span style="color: #41b1b7">1</span>
-            <span style="color: #5ea4e9">2</span>
-          </p>
-        </div>
-        <div class="opponentBet">20 / 32</div>
         <div class="timer"></div>
       </div>
-      <div id="middle-right" class="opponent">
-        <div class="card"></div>
-        <div class="card"></div>
-        <div class="opponentBet">60 | 940</div>
+      <div id="middle-right" class="hand">
+        <div class="name">&nbsp;</div>
+        <div class="bank">¢970</div>
+        <div class="matrix">
+          <div class="holeScore">
+            <div class="totalScore"></div>
+            <div class="holePoint"></div>
+            <div class="holePoint"></div>
+            <div class="holePoint"></div>
+          </div>
+          <div class="crossPair">
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+            <div class="matrixRow">
+              <div class="card"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+              <div class="holePoint"></div>
+            </div>
+          </div>
+        </div>
         <div class="timer"></div>
       </div>
     </div>
